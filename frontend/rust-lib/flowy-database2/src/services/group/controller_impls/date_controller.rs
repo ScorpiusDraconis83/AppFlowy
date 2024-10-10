@@ -1,18 +1,18 @@
 use async_trait::async_trait;
-use chrono::{DateTime, Datelike, Days, Duration, Local, NaiveDateTime};
+use chrono::{DateTime, Datelike, Days, Duration, Local};
 use collab_database::database::timestamp;
+use collab_database::fields::date_type_option::{DateCellData, DateTypeOption};
 use collab_database::fields::{Field, TypeOptionData};
-use collab_database::rows::{new_cell_builder, Cell, Cells, Row, RowDetail};
+use collab_database::rows::{new_cell_builder, Cell, Cells, Row};
+use flowy_error::{internal_error, FlowyResult};
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
-
-use flowy_error::{internal_error, FlowyResult};
 
 use crate::entities::{
   FieldType, GroupPB, GroupRowsNotificationPB, InsertedGroupPB, InsertedRowPB, RowMetaPB,
 };
 use crate::services::cell::insert_date_cell;
-use crate::services::field::{DateCellData, DateCellDataParser, DateTypeOption, TypeOption};
+use crate::services::field::{DateCellDataParser, TypeOption};
 use crate::services::group::action::GroupCustomize;
 use crate::services::group::configuration::GroupControllerContext;
 use crate::services::group::controller::BaseGroupController;
@@ -53,15 +53,14 @@ pub type DateGroupController =
 
 pub type DateGroupControllerContext = GroupControllerContext<DateGroupConfiguration>;
 
+#[async_trait]
 impl GroupCustomize for DateGroupController {
   type GroupTypeOption = DateTypeOption;
 
   fn placeholder_cell(&self) -> Option<Cell> {
-    Some(
-      new_cell_builder(FieldType::DateTime)
-        .insert_str_value("data", "")
-        .build(),
-    )
+    let mut cell = new_cell_builder(FieldType::DateTime);
+    cell.insert("data".into(), "".into());
+    Some(cell)
   }
 
   fn can_group(
@@ -74,7 +73,7 @@ impl GroupCustomize for DateGroupController {
 
   fn create_or_delete_group_when_cell_changed(
     &mut self,
-    _row_detail: &RowDetail,
+    _row: &Row,
     _old_cell_data: Option<&<Self::GroupTypeOption as TypeOption>::CellProtobufType>,
     _cell_data: &<Self::GroupTypeOption as TypeOption>::CellProtobufType,
   ) -> FlowyResult<(Option<InsertedGroupPB>, Option<GroupPB>)> {
@@ -87,7 +86,7 @@ impl GroupCustomize for DateGroupController {
     {
       let group = make_group_from_date_cell(&_cell_data.into(), &setting_content);
       let mut new_group = self.context.add_new_group(group)?;
-      new_group.group.rows.push(RowMetaPB::from(_row_detail));
+      new_group.group.rows.push(RowMetaPB::from(_row.clone()));
       inserted_group = Some(new_group);
     }
 
@@ -120,7 +119,7 @@ impl GroupCustomize for DateGroupController {
 
   fn add_or_remove_row_when_cell_changed(
     &mut self,
-    row_detail: &RowDetail,
+    row: &Row,
     cell_data: &<Self::GroupTypeOption as TypeOption>::CellProtobufType,
   ) -> Vec<GroupRowsNotificationPB> {
     let mut changesets = vec![];
@@ -128,17 +127,15 @@ impl GroupCustomize for DateGroupController {
     self.context.iter_mut_status_groups(|group| {
       let mut changeset = GroupRowsNotificationPB::new(group.id.clone());
       if group.id == get_date_group_id(&cell_data.into(), &setting_content) {
-        if !group.contains_row(&row_detail.row.id) {
+        if !group.contains_row(&row.id) {
           changeset
             .inserted_rows
-            .push(InsertedRowPB::new(RowMetaPB::from(row_detail)));
-          group.add_row(row_detail.clone());
+            .push(InsertedRowPB::new(RowMetaPB::from(row.clone())));
+          group.add_row(row.clone());
         }
-      } else if group.contains_row(&row_detail.row.id) {
-        group.remove_row(&row_detail.row.id);
-        changeset
-          .deleted_rows
-          .push(row_detail.row.id.clone().into_inner());
+      } else if group.contains_row(&row.id) {
+        group.remove_row(&row.id);
+        changeset.deleted_rows.push(row.id.clone().into_inner());
       }
 
       if !changeset.is_empty() {
@@ -193,7 +190,7 @@ impl GroupCustomize for DateGroupController {
     group_changeset
   }
 
-  fn delete_group_when_move_row(
+  fn delete_group_after_moving_row(
     &mut self,
     _row: &Row,
     cell_data: &<Self::GroupTypeOption as TypeOption>::CellProtobufType,
@@ -214,7 +211,7 @@ impl GroupCustomize for DateGroupController {
     deleted_group
   }
 
-  fn delete_group(&mut self, group_id: &str) -> FlowyResult<Option<TypeOptionData>> {
+  async fn delete_group(&mut self, group_id: &str) -> FlowyResult<Option<TypeOptionData>> {
     self.context.delete_group(group_id)?;
     Ok(None)
   }
@@ -224,7 +221,7 @@ impl GroupCustomize for DateGroupController {
       None => tracing::warn!("Can not find the group: {}", group_id),
       Some((_, _)) => {
         let date = DateTime::parse_from_str(group_id, GROUP_ID_DATE_FORMAT).unwrap();
-        let cell = insert_date_cell(date.timestamp(), None, Some(false), field);
+        let cell = insert_date_cell(date.timestamp(), None, None, Some(false), field);
         cells.insert(field.id.clone(), cell);
       },
     }
@@ -330,7 +327,9 @@ fn get_date_group_id(cell_data: &DateCellData, setting_content: &str) -> String 
 fn date_time_from_timestamp(timestamp: Option<i64>) -> DateTime<Local> {
   match timestamp {
     Some(timestamp) => {
-      let naive = NaiveDateTime::from_timestamp_opt(timestamp, 0).unwrap();
+      let naive = DateTime::from_timestamp(timestamp, 0)
+        .unwrap_or_default()
+        .naive_utc();
       let offset = *Local::now().offset();
 
       DateTime::<Local>::from_naive_utc_and_offset(naive, offset)
@@ -341,13 +340,11 @@ fn date_time_from_timestamp(timestamp: Option<i64>) -> DateTime<Local> {
 
 #[cfg(test)]
 mod tests {
-  use chrono::{offset, Days, Duration, NaiveDateTime};
-
-  use crate::services::field::date_type_option::DateTypeOption;
-  use crate::services::field::DateCellData;
   use crate::services::group::controller_impls::date_controller::{
     get_date_group_id, GROUP_ID_DATE_FORMAT,
   };
+  use chrono::{offset, Days, Duration};
+  use collab_database::fields::date_type_option::{DateCellData, DateTypeOption};
 
   #[test]
   fn group_id_name_test() {
@@ -357,9 +354,11 @@ mod tests {
       exp_group_id: String,
     }
 
-    let mar_14_2022 = NaiveDateTime::from_timestamp_opt(1647251762, 0).unwrap();
+    let mar_14_2022 = chrono::DateTime::from_timestamp(1647251762, 0)
+      .unwrap()
+      .naive_utc();
     let mar_14_2022_cd = DateCellData {
-      timestamp: Some(mar_14_2022.timestamp()),
+      timestamp: Some(mar_14_2022.and_utc().timestamp()),
       include_time: false,
       ..Default::default()
     };
@@ -410,6 +409,7 @@ mod tests {
             mar_14_2022
               .checked_add_signed(Duration::days(3))
               .unwrap()
+              .and_utc()
               .timestamp(),
           ),
           include_time: false,

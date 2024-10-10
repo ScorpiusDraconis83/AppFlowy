@@ -1,9 +1,9 @@
+use collab::util::AnyMapExt;
 use std::cmp::Ordering;
 
-use collab::core::any_map::AnyMapExtension;
-use collab_database::fields::{Field, TypeOptionData, TypeOptionDataBuilder};
+use collab_database::fields::text_type_option::RichTextTypeOption;
+use collab_database::fields::Field;
 use collab_database::rows::{new_cell_builder, Cell};
-use serde::{Deserialize, Serialize};
 
 use flowy_error::{FlowyError, FlowyResult};
 
@@ -16,34 +16,11 @@ use crate::services::field::{
 };
 use crate::services::sort::SortCondition;
 
-/// For the moment, the `RichTextTypeOptionPB` is empty. The `data` property is not
-/// used yet.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct RichTextTypeOption {
-  #[serde(default)]
-  pub inner: String,
-}
-
 impl TypeOption for RichTextTypeOption {
   type CellData = StringCellData;
   type CellChangeset = String;
   type CellProtobufType = ProtobufStr;
   type CellFilter = TextFilterPB;
-}
-
-impl From<TypeOptionData> for RichTextTypeOption {
-  fn from(data: TypeOptionData) -> Self {
-    let s = data.get_str_value(CELL_DATA).unwrap_or_default();
-    Self { inner: s }
-  }
-}
-
-impl From<RichTextTypeOption> for TypeOptionData {
-  fn from(data: RichTextTypeOption) -> Self {
-    TypeOptionDataBuilder::new()
-      .insert_str_value(CELL_DATA, data.inner)
-      .build()
-  }
 }
 
 impl TypeOptionTransform for RichTextTypeOption {}
@@ -82,6 +59,7 @@ impl CellDataDecoder for RichTextTypeOption {
       | FieldType::URL
       | FieldType::Summary
       | FieldType::Translate
+      | FieldType::Media
       | FieldType::Time => Some(StringCellData::from(stringify_cell(cell, field))),
       FieldType::Checklist
       | FieldType::LastEditedTime
@@ -148,6 +126,11 @@ impl TypeOptionCellDataCompare for RichTextTypeOption {
 
 #[derive(Default, Debug, Clone)]
 pub struct StringCellData(pub String);
+impl StringCellData {
+  pub fn into_inner(self) -> String {
+    self.0
+  }
+}
 impl std::ops::Deref for StringCellData {
   type Target = String;
 
@@ -164,15 +147,15 @@ impl TypeOptionCellData for StringCellData {
 
 impl From<&Cell> for StringCellData {
   fn from(cell: &Cell) -> Self {
-    Self(cell.get_str_value(CELL_DATA).unwrap_or_default())
+    Self(cell.get_as(CELL_DATA).unwrap_or_default())
   }
 }
 
 impl From<StringCellData> for Cell {
   fn from(data: StringCellData) -> Self {
-    new_cell_builder(FieldType::RichText)
-      .insert_str_value(CELL_DATA, data.0)
-      .build()
+    let mut cell = new_cell_builder(FieldType::RichText);
+    cell.insert(CELL_DATA.into(), data.0.into());
+    cell
   }
 }
 

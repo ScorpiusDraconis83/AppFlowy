@@ -3,9 +3,8 @@ use std::vec;
 
 use chrono::NaiveDateTime;
 use chrono::{offset, Duration};
-
+use collab_database::fields::date_type_option::DateCellData;
 use flowy_database2::entities::{CreateRowPayloadPB, FieldType};
-use flowy_database2::services::field::DateCellData;
 
 use crate::database::group_test::script::DatabaseGroupTest;
 use crate::database::group_test::script::GroupScript::*;
@@ -184,16 +183,19 @@ async fn change_date_on_moving_row_to_another_group() {
   let group = test.group_at_index(2).await;
   let rows = group.clone().rows;
   let row_id = &rows.first().unwrap().id;
-  let row_detail = test
+  let row = test
     .get_rows()
     .await
     .into_iter()
-    .find(|r| r.row.id.to_string() == *row_id)
+    .find(|r| r.id.to_string() == *row_id)
     .unwrap();
-  let cell = row_detail.row.cells.get(&date_field.id.clone()).unwrap();
+  let cell = row.cells.get(&date_field.id.clone()).unwrap();
   let date_cell = DateCellData::from(cell);
 
   let date_time =
     NaiveDateTime::parse_from_str("2022/11/01 00:00:00", "%Y/%m/%d %H:%M:%S").unwrap();
-  assert_eq!(date_time.timestamp(), date_cell.timestamp.unwrap());
+  assert_eq!(
+    date_time.and_utc().timestamp(),
+    date_cell.timestamp.unwrap()
+  );
 }

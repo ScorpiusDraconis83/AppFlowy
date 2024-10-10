@@ -1,24 +1,19 @@
-use std::cmp::Ordering;
-
-use collab::core::any_map::AnyMapExtension;
-use collab_database::fields::{TypeOptionData, TypeOptionDataBuilder};
-use collab_database::rows::Cell;
-use flowy_error::FlowyResult;
-use serde::{Deserialize, Serialize};
-
-use crate::entities::{TextFilterPB, URLCellDataPB};
+use crate::entities::{FieldType, TextFilterPB, URLCellDataPB};
 use crate::services::cell::{CellDataChangeset, CellDataDecoder};
 use crate::services::field::{
   TypeOption, TypeOptionCellDataCompare, TypeOptionCellDataFilter, TypeOptionCellDataSerde,
-  TypeOptionTransform, URLCellData,
+  TypeOptionTransform,
 };
 use crate::services::sort::SortCondition;
+use async_trait::async_trait;
+use collab_database::database::Database;
+use collab_database::fields::url_type_option::{URLCellData, URLTypeOption};
+use collab_database::fields::{Field, TypeOptionData};
+use collab_database::rows::Cell;
+use flowy_error::FlowyResult;
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct URLTypeOption {
-  pub url: String,
-  pub content: String,
-}
+use std::cmp::Ordering;
+use tracing::trace;
 
 impl TypeOption for URLTypeOption {
   type CellData = URLCellData;
@@ -27,24 +22,46 @@ impl TypeOption for URLTypeOption {
   type CellFilter = TextFilterPB;
 }
 
-impl From<TypeOptionData> for URLTypeOption {
-  fn from(data: TypeOptionData) -> Self {
-    let url = data.get_str_value("url").unwrap_or_default();
-    let content = data.get_str_value("content").unwrap_or_default();
-    Self { url, content }
+#[async_trait]
+impl TypeOptionTransform for URLTypeOption {
+  async fn transform_type_option(
+    &mut self,
+    view_id: &str,
+    field_id: &str,
+    old_type_option_field_type: FieldType,
+    _old_type_option_data: TypeOptionData,
+    _new_type_option_field_type: FieldType,
+    database: &mut Database,
+  ) {
+    match old_type_option_field_type {
+      FieldType::RichText => {
+        let rows = database
+          .get_cells_for_field(view_id, field_id)
+          .await
+          .into_iter()
+          .filter_map(|row| row.cell.map(|cell| (row.row_id, cell)))
+          .collect::<Vec<_>>();
+
+        trace!(
+          "Transforming RichText to URLTypeOption, updating {} row's cell content",
+          rows.len()
+        );
+        for (row_id, cell_data) in rows {
+          database
+            .update_row(row_id, |row| {
+              row.update_cells(|cell| {
+                cell.insert(field_id, Self::CellData::from(&cell_data));
+              });
+            })
+            .await;
+        }
+      },
+      _ => {
+        // Do nothing
+      },
+    }
   }
 }
-
-impl From<URLTypeOption> for TypeOptionData {
-  fn from(data: URLTypeOption) -> Self {
-    TypeOptionDataBuilder::new()
-      .insert_str_value("url", data.url)
-      .insert_str_value("content", data.content)
-      .build()
-  }
-}
-
-impl TypeOptionTransform for URLTypeOption {}
 
 impl TypeOptionCellDataSerde for URLTypeOption {
   fn protobuf_encode(
@@ -62,6 +79,17 @@ impl TypeOptionCellDataSerde for URLTypeOption {
 impl CellDataDecoder for URLTypeOption {
   fn decode_cell(&self, cell: &Cell) -> FlowyResult<<Self as TypeOption>::CellData> {
     self.parse_cell(cell)
+  }
+  fn decode_cell_with_transform(
+    &self,
+    cell: &Cell,
+    from_field_type: FieldType,
+    _field: &Field,
+  ) -> Option<<Self as TypeOption>::CellData> {
+    match from_field_type {
+      FieldType::RichText => Some(Self::CellData::from(cell)),
+      _ => None,
+    }
   }
 
   fn stringify_cell_data(&self, cell_data: <Self as TypeOption>::CellData) -> String {

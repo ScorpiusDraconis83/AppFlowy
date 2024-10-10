@@ -1,4 +1,94 @@
 # Release Notes
+## Version 0.7.1 - 07/10/2024
+### New Features
+- Copy link to share and open it in a browser
+- Enable the ability to edit the page title within the body of the document
+- Filter by last modified, created at, or a date range
+- Allow customization of database property icons
+- Support CTRL/CMD+X to delete the current line when the selection is collapsed in the document
+- Support window tiling on macOS
+- Add filters to grid views on mobile
+- Create and manage workspaces on mobile
+- Automatically convert property types for imported CSV files
+
+### Bug Fixes
+- Fixed calculations with filters applied
+- Fixed issues with importing data folders into a cloud account
+- Fixed French IME backtick issues
+- Fixed selection gesture bugs on mobile
+
+## Version 0.7.0 - 19/09/2024
+### New Features
+- Support reordering blocks in document with drag and drop
+- Support for adding a cover to a row/card in databases
+- Added support for accessing settings on the sign-in page
+- Added "Move to" option to the document menu in top right corner
+- Support for adjusting the document width from settings
+- Show full name of a group on hover
+- Colored group names in kanban boards
+- Support "Ask AI" on multiple lines of text
+- Support for keyboard gestures to move cursor on Mobile
+- Added markdown support for quickly inserting a code block using three backticks
+
+### Bug Fixes
+- Fixed a critical bug where the backtick character would crash the application
+- Fixed an issue with signing-in from the settings dialog where the dialog would persist
+- Fixed a visual bug with icon alignment in primary cell of database rows
+- Fixed a bug with filters applied where new rows were inserted in wrong position
+- Fixed a bug where "Untitled" would override the name of the row
+- Fixed page title not updating after renaming from "More"-menu
+- Fixed File block breaking row detail document
+- Fixed issues with reordering rows with sorting rules applied
+- Improvements to the File & Media type in Database
+- Performance improvement in Grid view
+- Fixed filters sometimes not applying properly in databases
+
+## Version 0.6.9 - 09/09/2024
+### New Features
+- Added a new property type, 'Files & media'
+- Supported Apple Sign-in
+- Displayed the page icon next to the row name when the row page contains nested notes
+- Enabled Delete Account in Settings
+- Included a collapsible navigation menu in your published site
+
+### Bug Fixes
+- Fixed the space name color issue in the community themes
+- Fixed database filters and sorting issues
+- Fixed the issue of not being able to fully display the title on Kanban cards
+- Fixed the inability to see the entire text of a checklist item when it's more than one line long
+- Fixed hide/unhide buttons in the No Status group
+- Fixed the inability to edit group names on Kanban boards
+- Made error codes more user-friendly
+- Added leading zeros to day and month in date format
+  
+## Version 0.6.8 - 22/08/2024
+### New Features
+- Enabled viewing data inside a database record on mobile.
+- Added the ability to invite members to a workspace on mobile.
+- Introduced Ask AI in the Home tab on mobile.
+- Import CSV files with up to 1,000 rows.
+- Convert properties from one type to another while preserving the data.
+- Optimized the speed of opening documents and databases.
+- Improved syncing performance across devices.
+- Added support for a monochrome app icon on Android.
+
+### Bug Fixes
+- Removed the Wayland header from the AppImage build.
+- Fixed the issue where pasting a web image on mobile failed.
+- Corrected the Local AI state when switching between different workspaces.
+- Fixed high CPU usage when opening large databases.
+
+## Version 0.6.7 - 13/08/2024
+### New Features
+- Redesigned the icon picker design on Desktop.
+- Redesigned the notification page on Mobile.
+
+### Bug Fixes
+- Enhance the toolbar tooltip functionality on Desktop.
+- Enhance the slash menu user experience on Desktop.
+- Fixed the issue where list style overrides occurred during text pasting.
+- Fixed the issue where linking multiple databases in the same document could cause random loss of focus.
+
 ## Version 0.6.6 - 30/07/2024
 ### New Features
 - Upgrade your workspace to a premium plan to unlock more features and storage.

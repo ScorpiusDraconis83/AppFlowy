@@ -1,10 +1,13 @@
-import { YjsDatabaseKey } from '@/application/collab.type';
+import { YjsDatabaseKey } from '@/application/types';
 import { FieldType, useCellSelector, useFieldSelector } from '@/application/database-yjs';
+import { FileMediaCellData, TextCell } from '@/application/database-yjs/cell.type';
 import Cell from '@/components/database/components/cell/Cell';
+import { PrimaryCell } from '@/components/database/components/cell/primary';
 import React, { CSSProperties, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ReactComponent as FileMediaSvg } from '@/assets/media.svg';
 
-export function CardField({ rowId, fieldId }: { rowId: string; fieldId: string; index: number }) {
+export function CardField ({ rowId, fieldId }: { rowId: string; fieldId: string; index: number }) {
   const { t } = useTranslation();
   const { field } = useFieldSelector(fieldId);
   const cell = useCellSelector({
@@ -44,12 +47,20 @@ export function CardField({ rowId, fieldId }: { rowId: string; fieldId: string; 
     return styleProperties;
   }, [isPrimary, type]);
 
-  if (isPrimary && !cell?.data) {
-    return (
-      <div className={'text-text-caption'} style={style}>
-        {t('grid.row.titlePlaceholder')}
-      </div>
-    );
+  if (isPrimary) {
+    if (!cell?.data) {
+      return (
+        <div className={'text-text-caption'} style={style}>
+          {t('grid.row.titlePlaceholder')}
+        </div>
+      );
+    } else {
+      return <PrimaryCell
+        showDocumentIcon readOnly cell={cell as TextCell} rowId={rowId} fieldId={fieldId}
+        style={style}
+      />;
+    }
+
   }
 
   if (Number(type) === FieldType.Checkbox) {
@@ -61,6 +72,19 @@ export function CardField({ rowId, fieldId }: { rowId: string; fieldId: string; 
         <span>{field?.get(YjsDatabaseKey.name) || ''}</span>
       </div>
     );
+  }
+
+  if (Number(type) === FieldType.FileMedia) {
+    const count = (cell?.data as FileMediaCellData)?.length || 0;
+
+    if (count === 0) return null;
+    return (
+      <div style={style} className={'flex items-center gap-1.5 cursor-text'}>
+        <FileMediaSvg className={'w-4 h-4'} />
+        {count}
+      </div>
+    );
+
   }
 
   return <Cell style={style} readOnly cell={cell} rowId={rowId} fieldId={fieldId} />;

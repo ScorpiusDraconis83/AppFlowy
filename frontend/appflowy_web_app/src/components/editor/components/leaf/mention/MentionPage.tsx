@@ -1,16 +1,15 @@
-import { ViewLayout } from '@/application/collab.type';
-import { ViewMeta } from '@/application/db/tables/view_metas';
+import { ViewLayout, View } from '@/application/types';
 import { ViewIcon } from '@/components/_shared/view-icon';
 import { useEditorContext } from '@/components/editor/EditorContext';
 import { isFlagEmoji } from '@/utils/emoji';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-function MentionPage({ pageId }: { pageId: string }) {
+function MentionPage ({ pageId }: { pageId: string }) {
   const context = useEditorContext();
   const { navigateToView, loadViewMeta } = context;
   const [unPublished, setUnPublished] = useState(false);
-  const [meta, setMeta] = useState<ViewMeta | null>(null);
+  const [meta, setMeta] = useState<View | null>(null);
 
   useEffect(() => {
     void (async () => {
@@ -44,9 +43,10 @@ function MentionPage({ pageId }: { pageId: string }) {
       }}
       className={`mention-inline px-1 underline`}
       contentEditable={false}
+      data-mention-id={pageId}
     >
       {unPublished ? (
-        <span className={'mention-unpublished cursor-text font-semibold text-text-caption'}>No Access</span>
+        <span className={'mention-unpublished font-semibold text-text-caption'}>No Access</span>
       ) : (
         <>
           <span className={`mention-icon ${isFlag ? 'icon' : ''}`}>

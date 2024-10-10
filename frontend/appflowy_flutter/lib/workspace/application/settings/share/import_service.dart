@@ -1,7 +1,6 @@
 import 'package:appflowy_backend/dispatch/dispatch.dart';
 import 'package:appflowy_backend/protobuf/flowy-error/errors.pb.dart';
-import 'package:appflowy_backend/protobuf/flowy-folder/import.pb.dart';
-import 'package:appflowy_backend/protobuf/flowy-folder/view.pbenum.dart';
+import 'package:appflowy_backend/protobuf/flowy-folder/protobuf.dart';
 import 'package:appflowy_result/appflowy_result.dart';
 
 class ImportPayload {
@@ -17,14 +16,13 @@ class ImportPayload {
 }
 
 class ImportBackendService {
-  static Future<FlowyResult<void, FlowyError>> importPages(
+  static Future<FlowyResult<RepeatedViewPB, FlowyError>> importPages(
     String parentViewId,
     List<ImportValuePayloadPB> values,
   ) async {
     final request = ImportPayloadPB(
       parentViewId: parentViewId,
       values: values,
-      syncAfterCreate: true,
     );
 
     return FolderEventImportData(request).send();

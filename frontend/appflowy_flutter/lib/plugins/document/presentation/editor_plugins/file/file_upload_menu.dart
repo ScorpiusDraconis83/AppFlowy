@@ -1,9 +1,7 @@
-import 'package:flutter/material.dart';
-
 import 'package:appflowy/generated/locale_keys.g.dart';
 import 'package:appflowy/shared/patterns/common_patterns.dart';
 import 'package:appflowy/startup/startup.dart';
-import 'package:appflowy_editor/appflowy_editor.dart';
+import 'package:cross_file/cross_file.dart';
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:dotted_border/dotted_border.dart';
 import 'package:easy_localization/easy_localization.dart';
@@ -13,16 +11,20 @@ import 'package:flowy_infra_ui/style_widget/hover.dart';
 import 'package:flowy_infra_ui/style_widget/text.dart';
 import 'package:flowy_infra_ui/style_widget/text_field.dart';
 import 'package:flowy_infra_ui/widget/spacing.dart';
+import 'package:flutter/material.dart';
+import 'package:universal_platform/universal_platform.dart';
 
 class FileUploadMenu extends StatefulWidget {
   const FileUploadMenu({
     super.key,
     required this.onInsertLocalFile,
     required this.onInsertNetworkFile,
+    this.allowMultipleFiles = false,
   });
 
-  final void Function(String path) onInsertLocalFile;
+  final void Function(List<XFile> files) onInsertLocalFile;
   final void Function(String url) onInsertNetworkFile;
+  final bool allowMultipleFiles;
 
   @override
   State<FileUploadMenu> createState() => _FileUploadMenuState();
@@ -39,13 +41,11 @@ class _FileUploadMenuState extends State<FileUploadMenu> {
         mainAxisSize: MainAxisSize.min,
         children: [
           TabBar(
-            onTap: (value) => setState(() {
-              currentTab = value;
-            }),
+            onTap: (value) => setState(() => currentTab = value),
             isScrollable: true,
             padding: EdgeInsets.zero,
             overlayColor: WidgetStatePropertyAll(
-              PlatformExtension.isDesktop
+              UniversalPlatform.isDesktop
                   ? Theme.of(context).colorScheme.secondary
                   : Colors.transparent,
             ),
@@ -61,9 +61,10 @@ class _FileUploadMenuState extends State<FileUploadMenu> {
           const Divider(height: 4),
           if (currentTab == 0) ...[
             _FileUploadLocal(
-              onFilePicked: (path) {
-                if (path != null) {
-                  widget.onInsertLocalFile(path);
+              allowMultipleFiles: widget.allowMultipleFiles,
+              onFilesPicked: (files) {
+                if (files.isNotEmpty) {
+                  widget.onInsertLocalFile(files);
                 }
               },
             ),
@@ -88,7 +89,7 @@ class _Tab extends StatelessWidget {
         left: 12.0,
         right: 12.0,
         bottom: 8.0,
-        top: PlatformExtension.isMobile ? 0 : 8.0,
+        top: UniversalPlatform.isMobile ? 0 : 8.0,
       ),
       child: FlowyText(title),
     );
@@ -96,9 +97,13 @@ class _Tab extends StatelessWidget {
 }
 
 class _FileUploadLocal extends StatefulWidget {
-  const _FileUploadLocal({required this.onFilePicked});
+  const _FileUploadLocal({
+    required this.onFilesPicked,
+    this.allowMultipleFiles = false,
+  });
 
-  final void Function(String?) onFilePicked;
+  final void Function(List<XFile>) onFilesPicked;
+  final bool allowMultipleFiles;
 
   @override
   State<_FileUploadLocal> createState() => _FileUploadLocalState();
@@ -110,14 +115,36 @@ class _FileUploadLocalState extends State<_FileUploadLocal> {
   @override
   Widget build(BuildContext context) {
     final constraints =
-        PlatformExtension.isMobile ? const BoxConstraints(minHeight: 92) : null;
+        UniversalPlatform.isMobile ? const BoxConstraints(minHeight: 92) : null;
+
+    if (UniversalPlatform.isMobile) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: SizedBox(
+          height: 32,
+          width: 300,
+          child: FlowyButton(
+            backgroundColor: Theme.of(context).colorScheme.primary,
+            hoverColor: Theme.of(context).colorScheme.primary.withOpacity(0.9),
+            showDefaultBoxDecorationOnMobile: true,
+            margin: const EdgeInsets.all(5),
+            text: FlowyText(
+              LocaleKeys.document_plugins_file_uploadMobile.tr(),
+              textAlign: TextAlign.center,
+              color: Theme.of(context).colorScheme.onPrimary,
+            ),
+            onTap: () => _uploadFile(context),
+          ),
+        ),
+      );
+    }
 
     return Padding(
       padding: const EdgeInsets.all(4),
       child: DropTarget(
         onDragEntered: (_) => setState(() => isDragging = true),
         onDragExited: (_) => setState(() => isDragging = false),
-        onDragDone: (details) => widget.onFilePicked(details.files.first.path),
+        onDragDone: (details) => widget.onFilesPicked(details.files),
         child: MouseRegion(
           cursor: SystemMouseCursors.click,
           child: GestureDetector(
@@ -142,7 +169,7 @@ class _FileUploadLocalState extends State<_FileUploadLocal> {
                   borderType: BorderType.RRect,
                   color: isDragging
                       ? Theme.of(context).colorScheme.primary
-                      : Colors.black,
+                      : Theme.of(context).hintColor,
                   child: Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -153,7 +180,7 @@ class _FileUploadLocalState extends State<_FileUploadLocal> {
                             LocaleKeys.document_plugins_file_dropFileToUpload
                                 .tr(),
                             fontSize: 16,
-                            color: Theme.of(context).colorScheme.primary,
+                            color: Theme.of(context).hintColor,
                           ),
                           const VSpace(13.5),
                         ] else ...[
@@ -162,7 +189,9 @@ class _FileUploadLocalState extends State<_FileUploadLocal> {
                                 .tr(),
                             fontSize: 16,
                             maxLines: 2,
+                            lineHeight: 1.5,
                             textAlign: TextAlign.center,
+                            color: Theme.of(context).hintColor,
                           ),
                         ],
                       ],
@@ -178,8 +207,16 @@ class _FileUploadLocalState extends State<_FileUploadLocal> {
   }
 
   Future<void> _uploadFile(BuildContext context) async {
-    final result = await getIt<FilePickerService>().pickFiles(dialogTitle: '');
-    widget.onFilePicked(result?.files.first.path);
+    final result = await getIt<FilePickerService>().pickFiles(
+      dialogTitle: '',
+      allowMultiple: widget.allowMultipleFiles,
+    );
+
+    final List<XFile> files = result?.files.isNotEmpty ?? false
+        ? result!.files.map((f) => f.xFile).toList()
+        : const [];
+
+    widget.onFilesPicked(files);
   }
 }
 
@@ -199,7 +236,7 @@ class _FileUploadNetworkState extends State<_FileUploadNetwork> {
   @override
   Widget build(BuildContext context) {
     final constraints =
-        PlatformExtension.isMobile ? const BoxConstraints(minHeight: 92) : null;
+        UniversalPlatform.isMobile ? const BoxConstraints(minHeight: 92) : null;
 
     return Container(
       padding: const EdgeInsets.all(8),
@@ -207,6 +244,7 @@ class _FileUploadNetworkState extends State<_FileUploadNetwork> {
       alignment: Alignment.center,
       child: Column(
         children: [
+          const VSpace(12),
           FlowyTextField(
             hintText: LocaleKeys.document_plugins_file_networkHint.tr(),
             onChanged: (value) => inputText = value,
@@ -219,19 +257,25 @@ class _FileUploadNetworkState extends State<_FileUploadNetwork> {
               color: Theme.of(context).colorScheme.error,
             ),
           ],
-          const VSpace(8),
+          const VSpace(20),
           SizedBox(
-            width: 160,
+            height: 32,
+            width: 300,
             child: FlowyButton(
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              hoverColor:
+                  Theme.of(context).colorScheme.primary.withOpacity(0.9),
               showDefaultBoxDecorationOnMobile: true,
-              margin: const EdgeInsets.all(8.0),
+              margin: const EdgeInsets.all(5),
               text: FlowyText(
                 LocaleKeys.document_plugins_file_networkAction.tr(),
                 textAlign: TextAlign.center,
+                color: Theme.of(context).colorScheme.onPrimary,
               ),
               onTap: submit,
             ),
           ),
+          const VSpace(8),
         ],
       ),
     );

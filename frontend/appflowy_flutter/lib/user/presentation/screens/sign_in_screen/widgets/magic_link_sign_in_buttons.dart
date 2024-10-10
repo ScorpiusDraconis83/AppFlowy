@@ -1,7 +1,6 @@
 import 'package:appflowy/generated/locale_keys.g.dart';
 import 'package:appflowy/user/application/sign_in_bloc.dart';
 import 'package:appflowy/workspace/presentation/widgets/dialogs.dart';
-import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flowy_infra/size.dart';
 import 'package:flowy_infra_ui/flowy_infra_ui.dart';
@@ -9,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:string_validator/string_validator.dart';
 import 'package:toastification/toastification.dart';
+import 'package:universal_platform/universal_platform.dart';
 
 class SignInWithMagicLinkButtons extends StatefulWidget {
   const SignInWithMagicLinkButtons({super.key});
@@ -21,10 +21,12 @@ class SignInWithMagicLinkButtons extends StatefulWidget {
 class _SignInWithMagicLinkButtonsState
     extends State<SignInWithMagicLinkButtons> {
   final controller = TextEditingController();
+  final FocusNode _focusNode = FocusNode();
 
   @override
   void dispose() {
     controller.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
@@ -34,13 +36,23 @@ class _SignInWithMagicLinkButtonsState
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SizedBox(
-          height: 48.0,
+          height: UniversalPlatform.isMobile ? 38.0 : 48.0,
           child: FlowyTextField(
             autoFocus: false,
+            focusNode: _focusNode,
             controller: controller,
+            borderRadius: BorderRadius.circular(4.0),
             hintText: LocaleKeys.signIn_pleaseInputYourEmail.tr(),
+            hintStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontSize: 14.0,
+                  color: Theme.of(context).hintColor,
+                ),
+            textStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontSize: 14.0,
+                ),
             keyboardType: TextInputType.emailAddress,
             onSubmitted: (_) => _sendMagicLink(context, controller.text),
+            onTapOutside: (_) => _focusNode.unfocus(),
           ),
         ),
         const VSpace(12),
@@ -85,17 +97,17 @@ class _ConfirmButton extends StatelessWidget {
           LoginType.signIn => LocaleKeys.signIn_signInWithMagicLink.tr(),
           LoginType.signUp => LocaleKeys.signIn_signUpWithMagicLink.tr(),
         };
-        if (PlatformExtension.isMobile) {
+        if (UniversalPlatform.isMobile) {
           return ElevatedButton(
             style: ElevatedButton.styleFrom(
-              minimumSize: const Size(double.infinity, 56),
+              minimumSize: const Size(double.infinity, 32),
+              maximumSize: const Size(double.infinity, 38),
             ),
             onPressed: onTap,
             child: FlowyText(
               name,
               fontSize: 14,
               color: Theme.of(context).colorScheme.onPrimary,
-              fontWeight: FontWeight.w500,
             ),
           );
         } else {
@@ -108,6 +120,7 @@ class _ConfirmButton extends StatelessWidget {
               text: FlowyText.medium(
                 name,
                 textAlign: TextAlign.center,
+                color: Theme.of(context).colorScheme.onPrimary,
               ),
               radius: Corners.s6Border,
             ),

@@ -1,9 +1,12 @@
+import 'dart:io';
 import 'dart:ui';
 
 import 'package:appflowy/generated/flowy_svgs.g.dart';
 import 'package:appflowy/generated/locale_keys.g.dart';
 import 'package:appflowy/mobile/presentation/notifications/mobile_notifications_screen.dart';
 import 'package:appflowy/mobile/presentation/widgets/navigation_bar_button.dart';
+import 'package:appflowy/shared/popup_menu/appflowy_popup_menu.dart';
+import 'package:appflowy/shared/red_dot.dart';
 import 'package:appflowy/startup/startup.dart';
 import 'package:appflowy/user/application/reminder/reminder_bloc.dart';
 import 'package:appflowy/util/theme_extension.dart';
@@ -26,23 +29,41 @@ final PropertyValueNotifier<ViewLayoutPB?> mobileCreateNewPageNotifier =
 final ValueNotifier<BottomNavigationBarActionType> bottomNavigationBarType =
     ValueNotifier(BottomNavigationBarActionType.home);
 
-const _homeLabel = 'home';
-const _addLabel = 'add';
-const _notificationLabel = 'notification';
+enum BottomNavigationBarItemType {
+  home,
+  add,
+  notification;
+
+  String get label {
+    return switch (this) {
+      BottomNavigationBarItemType.home => 'home',
+      BottomNavigationBarItemType.add => 'add',
+      BottomNavigationBarItemType.notification => 'notification',
+    };
+  }
+
+  ValueKey get valueKey {
+    return ValueKey(label);
+  }
+}
+
 final _items = <BottomNavigationBarItem>[
-  const BottomNavigationBarItem(
-    label: _homeLabel,
-    icon: FlowySvg(FlowySvgs.m_home_unselected_m),
-    activeIcon: FlowySvg(FlowySvgs.m_home_selected_m, blendMode: null),
+  BottomNavigationBarItem(
+    key: BottomNavigationBarItemType.home.valueKey,
+    label: BottomNavigationBarItemType.home.label,
+    icon: const FlowySvg(FlowySvgs.m_home_unselected_m),
+    activeIcon: const FlowySvg(FlowySvgs.m_home_selected_m, blendMode: null),
   ),
-  const BottomNavigationBarItem(
-    label: _addLabel,
-    icon: FlowySvg(FlowySvgs.m_home_add_m),
+  BottomNavigationBarItem(
+    key: BottomNavigationBarItemType.add.valueKey,
+    label: BottomNavigationBarItemType.add.label,
+    icon: const FlowySvg(FlowySvgs.m_home_add_m),
   ),
-  const BottomNavigationBarItem(
-    label: _notificationLabel,
-    icon: _NotificationNavigationBarItemIcon(),
-    activeIcon: _NotificationNavigationBarItemIcon(
+  BottomNavigationBarItem(
+    key: BottomNavigationBarItemType.notification.valueKey,
+    label: BottomNavigationBarItemType.notification.label,
+    icon: const _NotificationNavigationBarItemIcon(),
+    activeIcon: const _NotificationNavigationBarItemIcon(
       isActive: true,
     ),
   ),
@@ -162,30 +183,11 @@ class _NotificationNavigationBarItemIcon extends StatelessWidget {
                 const Positioned(
                   top: 2,
                   right: 4,
-                  child: _RedDot(),
+                  child: NotificationRedDot(),
                 ),
             ],
           );
         },
-      ),
-    );
-  }
-}
-
-class _RedDot extends StatelessWidget {
-  const _RedDot();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 6,
-      height: 6,
-      clipBehavior: Clip.antiAlias,
-      decoration: ShapeDecoration(
-        color: const Color(0xFFFF2214),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
       ),
     );
   }
@@ -211,30 +213,51 @@ class _HomePageNavigationBar extends StatelessWidget {
             border: context.border,
             color: context.backgroundColor,
           ),
-          child: BottomNavigationBar(
-            showSelectedLabels: false,
-            showUnselectedLabels: false,
-            enableFeedback: false,
-            type: BottomNavigationBarType.fixed,
-            elevation: 0,
-            items: _items,
-            backgroundColor: Colors.transparent,
-            currentIndex: navigationShell.currentIndex,
-            onTap: (int bottomBarIndex) => _onTap(context, bottomBarIndex),
+          child: Theme(
+            data: _getThemeData(context),
+            child: BottomNavigationBar(
+              showSelectedLabels: false,
+              showUnselectedLabels: false,
+              enableFeedback: false,
+              type: BottomNavigationBarType.fixed,
+              elevation: 0,
+              items: _items,
+              backgroundColor: Colors.transparent,
+              currentIndex: navigationShell.currentIndex,
+              onTap: (int bottomBarIndex) => _onTap(context, bottomBarIndex),
+            ),
           ),
         ),
       ),
     );
   }
 
+  ThemeData _getThemeData(BuildContext context) {
+    if (Platform.isAndroid) {
+      return Theme.of(context);
+    }
+
+    // hide the splash effect for iOS
+    return Theme.of(context).copyWith(
+      splashFactory: NoSplash.splashFactory,
+      splashColor: Colors.transparent,
+      highlightColor: Colors.transparent,
+    );
+  }
+
   /// Navigate to the current location of the branch at the provided index when
   /// tapping an item in the BottomNavigationBar.
   void _onTap(BuildContext context, int bottomBarIndex) {
-    if (_items[bottomBarIndex].label == _addLabel) {
+    // close the popup menu
+    closePopupMenu();
+
+    final label = _items[bottomBarIndex].label;
+    if (label == BottomNavigationBarItemType.add.label) {
       // show an add dialog
       mobileCreateNewPageNotifier.value = ViewLayoutPB.Document;
-
       return;
+    } else if (label == BottomNavigationBarItemType.notification.label) {
+      getIt<ReminderBloc>().add(const ReminderEvent.refresh());
     }
     // When navigating to a new branch, it's recommended to use the goBranch
     // method, as doing so makes sure the last navigation state of the

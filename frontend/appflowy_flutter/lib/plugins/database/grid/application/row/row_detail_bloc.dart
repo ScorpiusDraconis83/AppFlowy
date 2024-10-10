@@ -1,12 +1,17 @@
+import 'package:flutter/foundation.dart';
+
 import 'package:appflowy/plugins/database/application/cell/cell_controller.dart';
 import 'package:appflowy/plugins/database/application/field/field_controller.dart';
 import 'package:appflowy/plugins/database/application/field/field_info.dart';
+import 'package:appflowy/plugins/database/application/row/row_controller.dart';
+import 'package:appflowy/plugins/database/application/row/row_service.dart';
 import 'package:appflowy/plugins/database/domain/field_service.dart';
 import 'package:appflowy/plugins/database/domain/field_settings_service.dart';
-import 'package:appflowy/plugins/database/application/row/row_controller.dart';
+import 'package:appflowy/plugins/database/domain/row_meta_listener.dart';
 import 'package:appflowy/plugins/database/widgets/setting/field_visibility_extension.dart';
 import 'package:appflowy_backend/log.dart';
 import 'package:appflowy_backend/protobuf/flowy-database2/field_settings_entities.pb.dart';
+import 'package:appflowy_backend/protobuf/flowy-database2/row_entities.pb.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
@@ -16,20 +21,26 @@ class RowDetailBloc extends Bloc<RowDetailEvent, RowDetailState> {
   RowDetailBloc({
     required this.fieldController,
     required this.rowController,
-  }) : super(RowDetailState.initial()) {
+  })  : _metaListener = RowMetaListener(rowController.rowId),
+        _rowService = RowBackendService(viewId: rowController.viewId),
+        super(RowDetailState.initial(rowController.rowMeta)) {
     _dispatch();
     _startListening();
     _init();
+
+    rowController.initialize();
   }
 
   final FieldController fieldController;
   final RowController rowController;
-
+  final RowMetaListener _metaListener;
+  final RowBackendService _rowService;
   final List<CellContext> allCells = [];
 
   @override
   Future<void> close() async {
-    rowController.dispose();
+    await rowController.dispose();
+    await _metaListener.stop();
     return super.close();
   }
 
@@ -80,12 +91,35 @@ class RowDetailBloc extends Bloc<RowDetailEvent, RowDetailState> {
               ),
             );
           },
+          startEditingField: (fieldId) {
+            emit(state.copyWith(editingFieldId: fieldId));
+          },
+          startEditingNewField: (fieldId) {
+            emit(state.copyWith(editingFieldId: fieldId, newFieldId: fieldId));
+          },
+          endEditingField: () {
+            emit(state.copyWith(editingFieldId: "", newFieldId: ""));
+          },
+          removeCover: () => _rowService.removeCover(rowController.rowId),
+          setCover: (cover) =>
+              _rowService.updateMeta(rowId: rowController.rowId, cover: cover),
+          didReceiveRowMeta: (rowMeta) {
+            emit(state.copyWith(rowMeta: rowMeta));
+          },
         );
       },
     );
   }
 
   void _startListening() {
+    _metaListener.start(
+      callback: (rowMeta) {
+        if (!isClosed) {
+          add(RowDetailEvent.didReceiveRowMeta(rowMeta));
+        }
+      },
+    );
+
     rowController.addListener(
       onRowChanged: (cellMap, reason) {
         if (isClosed) {
@@ -125,7 +159,7 @@ class RowDetailBloc extends Bloc<RowDetailEvent, RowDetailState> {
   }
 
   void _init() {
-    allCells.addAll(rowController.loadData());
+    allCells.addAll(rowController.loadCells());
     int numHiddenFields = 0;
     final visibleCells = <CellContext>[];
     for (final cell in allCells) {
@@ -217,6 +251,23 @@ class RowDetailEvent with _$RowDetailEvent {
   /// Used to hide/show the hidden fields in the row detail page
   const factory RowDetailEvent.toggleHiddenFieldVisibility() =
       _ToggleHiddenFieldVisibility;
+
+  /// Begin editing an event;
+  const factory RowDetailEvent.startEditingField(String fieldId) =
+      _StartEditingField;
+
+  const factory RowDetailEvent.startEditingNewField(String fieldId) =
+      _StartEditingNewField;
+
+  /// End editing an event
+  const factory RowDetailEvent.endEditingField() = _EndEditingField;
+
+  const factory RowDetailEvent.removeCover() = _RemoveCover;
+
+  const factory RowDetailEvent.setCover(RowCoverPB cover) = _SetCover;
+
+  const factory RowDetailEvent.didReceiveRowMeta(RowMetaPB rowMeta) =
+      _DidReceiveRowMeta;
 }
 
 @freezed
@@ -226,12 +277,18 @@ class RowDetailState with _$RowDetailState {
     required List<CellContext> visibleCells,
     required bool showHiddenFields,
     required int numHiddenFields,
+    required String editingFieldId,
+    required String newFieldId,
+    required RowMetaPB rowMeta,
   }) = _RowDetailState;
 
-  factory RowDetailState.initial() => const RowDetailState(
+  factory RowDetailState.initial(RowMetaPB rowMeta) => RowDetailState(
         fields: [],
         visibleCells: [],
         showHiddenFields: false,
         numHiddenFields: 0,
+        editingFieldId: "",
+        newFieldId: "",
+        rowMeta: rowMeta,
       );
 }

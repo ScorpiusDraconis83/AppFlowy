@@ -957,11 +957,6 @@
       "cloudServerType": "Cloud Server",
       "cloudServerTypeTip": "Bitte beachte, dass der aktuelle Benutzer ausgeloggt wird beim wechsel des Cloud-Servers",
       "cloudLocal": "Lokal",
-      "cloudSupabase": "Supabase",
-      "cloudSupabaseUrl": "Supabase URL",
-      "cloudSupabaseUrlCanNotBeEmpty": "Die Supabase-URL darf nicht leer sein",
-      "cloudSupabaseAnonKey": "Supabase anonymer Schlüssel",
-      "cloudSupabaseAnonKeyCanNotBeEmpty": "Der anonyme Schlüssel darf nicht leer sein",
       "cloudAppFlowy": "@:appName Cloud Beta",
       "cloudAppFlowySelfHost": "@:appName Cloud Self-hosted",
       "appFlowyCloudUrlCanNotBeEmpty": "Die Cloud-URL darf nicht leer sein",
@@ -1197,8 +1192,8 @@
       "tooltipSelectIcon": "Symbol auswählen",
       "selectAnIcon": "Ein Symbol auswählen",
       "pleaseInputYourOpenAIKey": "Bitte gebe den AI-Schlüssel ein",
-      "pleaseInputYourStabilityAIKey": "Bitte gebe den Stability AI Schlüssel ein",
-      "clickToLogout": "Klicken, um den aktuellen Nutzer auszulogen"
+      "clickToLogout": "Klicken, um den aktuellen Nutzer auszulogen",
+      "pleaseInputYourStabilityAIKey": "Bitte gebe den Stability AI Schlüssel ein"
     },
     "mobile": {
       "personalInfo": "Persönliche Informationen",
@@ -1462,7 +1457,7 @@
       "tagName": "Tag-Name"
     },
     "checklist": {
-      "taskHint": "Aufgbenbeschreibbung",
+      "taskHint": "Aufgabenbeschreibung",
       "addNew": "Füge eine Aufgabe hinzu",
       "submitNewTask": "Erstellen",
       "hideComplete": "Blende abgeschlossene Aufgaben aus",
@@ -1742,7 +1737,6 @@
       },
       "searchForAnImage": "Nach einem Bild suchen",
       "pleaseInputYourOpenAIKey": "biitte den AI Schlüssel in der Einstellungsseite eingeben",
-      "pleaseInputYourStabilityAIKey": "biitte den Stability AI Schlüssel in der Einstellungsseite eingeben",
       "saveImageToGallery": "Bild speichern",
       "failedToAddImageToGallery": "Das Bild konnte nicht zur Galerie hinzugefügt werden",
       "successToAddImageToGallery": "Das Bild wurde zur Galerie hinzugefügt werden",
@@ -1764,7 +1758,8 @@
           "scalePercentage": "{}%",
           "deleteImageTooltip": "Bild löschen"
         }
-      }
+      },
+      "pleaseInputYourStabilityAIKey": "biitte den Stability AI Schlüssel in der Einstellungsseite eingeben"
     },
     "codeBlock": {
       "language": {

@@ -15,6 +15,7 @@ import 'package:appflowy/shared/google_fonts_extension.dart';
 import 'package:appflowy/util/string_extension.dart';
 import 'package:appflowy/workspace/application/settings/appearance/base_appearance.dart';
 import 'package:appflowy/workspace/application/view/view_bloc.dart';
+import 'package:appflowy_backend/log.dart';
 import 'package:appflowy_backend/protobuf/flowy-folder/view.pb.dart';
 import 'package:appflowy_backend/protobuf/flowy-user/protobuf.dart';
 import 'package:appflowy_editor/appflowy_editor.dart';
@@ -34,10 +35,12 @@ class DocumentImmersiveCover extends StatefulWidget {
     super.key,
     required this.view,
     required this.userProfilePB,
+    this.fixedTitle,
   });
 
   final ViewPB view;
   final UserProfilePB userProfilePB;
+  final String? fixedTitle;
 
   @override
   State<DocumentImmersiveCover> createState() => _DocumentImmersiveCoverState();
@@ -55,6 +58,9 @@ class _DocumentImmersiveCoverState extends State<DocumentImmersiveCover> {
   void initState() {
     super.initState();
     selectionNotifier?.addListener(_unfocus);
+    if (widget.view.name.isEmpty) {
+      focusNode.requestFocus();
+    }
   }
 
   @override
@@ -75,7 +81,7 @@ class _DocumentImmersiveCoverState extends State<DocumentImmersiveCover> {
         child: BlocConsumer<DocumentImmersiveCoverBloc,
             DocumentImmersiveCoverState>(
           listener: (context, state) {
-            if (textEditingController.text.isEmpty) {
+            if (textEditingController.text != state.name) {
               textEditingController.text = state.name;
             }
           },
@@ -143,16 +149,28 @@ class _DocumentImmersiveCoverState extends State<DocumentImmersiveCover> {
       fontFamily = getGoogleFontSafely(documentFontFamily).fontFamily;
     }
 
+    if (widget.fixedTitle != null) {
+      return FlowyText(
+        widget.fixedTitle!,
+        fontSize: 28.0,
+        fontWeight: FontWeight.w700,
+        fontFamily: fontFamily,
+        color:
+            state.cover.isNone || state.cover.isPresets ? null : Colors.white,
+        overflow: TextOverflow.ellipsis,
+      );
+    }
+
     return AutoSizeTextField(
       controller: textEditingController,
       focusNode: focusNode,
       minFontSize: 18.0,
-      decoration: const InputDecoration(
+      decoration: InputDecoration(
         border: InputBorder.none,
         enabledBorder: InputBorder.none,
         disabledBorder: InputBorder.none,
         focusedBorder: InputBorder.none,
-        hintText: '',
+        hintText: LocaleKeys.menuAppHeader_defaultNewPageName.tr(),
         contentPadding: EdgeInsets.zero,
       ),
       scrollController: scrollController,
@@ -169,11 +187,15 @@ class _DocumentImmersiveCoverState extends State<DocumentImmersiveCover> {
         const Duration(milliseconds: 300),
         () => _rename(name),
       ),
-      onSubmitted: (name) => Debounce.debounce(
-        'rename',
-        const Duration(milliseconds: 300),
-        () => _rename(name),
-      ),
+      onSubmitted: (name) {
+        // focus on the document
+        _createNewLine();
+        Debounce.debounce(
+          'rename',
+          const Duration(milliseconds: 300),
+          () => _rename(name),
+        );
+      },
     );
   }
 
@@ -299,5 +321,36 @@ class _DocumentImmersiveCoverState extends State<DocumentImmersiveCover> {
   void _rename(String name) {
     scrollController.position.jumpTo(0);
     context.read<ViewBloc>().add(ViewEvent.rename(name));
+  }
+
+  Future<void> _createNewLine() async {
+    focusNode.unfocus();
+
+    final selection = textEditingController.selection;
+    final text = textEditingController.text;
+    // split the text into two lines based on the cursor position
+    final parts = [
+      text.substring(0, selection.baseOffset),
+      text.substring(selection.baseOffset),
+    ];
+    textEditingController.text = parts[0];
+
+    final editorState = context.read<DocumentBloc>().state.editorState;
+    if (editorState == null) {
+      Log.info('editorState is null when creating new line');
+      return;
+    }
+
+    final transaction = editorState.transaction;
+    transaction.insertNode([0], paragraphNode(text: parts[1]));
+    await editorState.apply(transaction);
+
+    // update selection instead of using afterSelection in transaction,
+    //  because it will cause the cursor to jump
+    await editorState.updateSelectionWithReason(
+      Selection.collapsed(Position(path: [0])),
+      // trigger the keyboard service.
+      reason: SelectionUpdateReason.uiEvent,
+    );
   }
 }

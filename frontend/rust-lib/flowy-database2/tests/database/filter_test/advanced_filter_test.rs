@@ -27,7 +27,7 @@ async fn create_advanced_filter_test() {
 
   let create_date_filter = || -> DateFilterPB {
     DateFilterPB {
-      condition: DateFilterConditionPB::DateAfter,
+      condition: DateFilterConditionPB::DateStartsAfter,
       timestamp: Some(1651366800),
       ..Default::default()
     }
@@ -59,7 +59,6 @@ async fn create_advanced_filter_test() {
   // OR
 
   let or_filter = test.get_filter(FilterType::Or, None).await.unwrap();
-
   let checkbox_filter_bytes: Result<Bytes, ProtobufError> = create_checkbox_filter().try_into();
   let checkbox_filter_bytes = checkbox_filter_bytes.unwrap().to_vec();
 
@@ -199,7 +198,7 @@ async fn create_advanced_filter_with_conversion_test() {
 
   let create_date_filter = || -> DateFilterPB {
     DateFilterPB {
-      condition: DateFilterConditionPB::DateAfter,
+      condition: DateFilterConditionPB::DateStartsAfter,
       timestamp: Some(1651366800),
       ..Default::default()
     }

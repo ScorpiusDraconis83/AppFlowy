@@ -1,105 +1,98 @@
+import { HEADER_HEIGHT } from '@/application/constants';
 import { usePublishContext } from '@/application/publish';
-import { openOrDownload } from '@/components/publish/header/utils';
-import { Divider, IconButton, Tooltip } from '@mui/material';
-import { debounce } from 'lodash-es';
-import React, { useCallback, useMemo } from 'react';
-import { OutlinePopover } from '@/components/publish/outline';
-import { useTranslation } from 'react-i18next';
-import Breadcrumb from './Breadcrumb';
-import { ReactComponent as Logo } from '@/assets/logo.svg';
-import MoreActions from './MoreActions';
+import { UIVariant } from '@/application/types';
 import { ReactComponent as SideOutlined } from '@/assets/side_outlined.svg';
-// import { Duplicate } from './duplicate';
+import { Breadcrumb } from '@/components/_shared/breadcrumb';
+import { OutlinePopover } from '@/components/_shared/outline';
+import Outline from '@/components/_shared/outline/Outline';
+import { useOutlinePopover } from '@/components/_shared/outline/outline.hooks';
+import BreadcrumbSkeleton from '@/components/_shared/skeleton/BreadcrumbSkeleton';
+import { getPlatform } from '@/utils/platform';
+import { IconButton } from '@mui/material';
+import React, { lazy, Suspense, useMemo } from 'react';
 
-export const HEADER_HEIGHT = 48;
+const RightMenu = lazy(() => import('@/components/publish/header/RightMenu'));
 
-export function PublishViewHeader({ onOpenDrawer, openDrawer }: { onOpenDrawer: () => void; openDrawer: boolean }) {
-  const { t } = useTranslation();
+export function PublishViewHeader ({
+  drawerWidth, onOpenDrawer, openDrawer, onCloseDrawer,
+}: {
+  onOpenDrawer: () => void;
+  drawerWidth: number;
+  openDrawer: boolean;
+  onCloseDrawer: () => void
+}) {
   const viewMeta = usePublishContext()?.viewMeta;
-  const crumbs = useMemo(() => {
-    const ancestors = viewMeta?.ancestor_views.slice(1) || [];
+  const outline = usePublishContext()?.outline;
+  const toView = usePublishContext()?.toView;
+  const crumbs = usePublishContext()?.breadcrumbs;
 
-    return ancestors.map((ancestor) => {
-      let icon;
-
-      try {
-        const extra = ancestor?.extra ? JSON.parse(ancestor.extra) : {};
-
-        icon = extra.icon?.value || ancestor.icon?.value;
-      } catch (e) {
-        // ignore
-      }
-
-      return {
-        viewId: ancestor.view_id,
-        name: ancestor.name,
-        icon: icon,
-        layout: ancestor.layout,
-        extra: ancestor.extra,
-      };
-    });
-  }, [viewMeta]);
-  const [openPopover, setOpenPopover] = React.useState(false);
-
-  const debounceClosePopover = useMemo(() => {
-    return debounce(() => {
-      setOpenPopover(false);
-    }, 200);
+  const {
+    openPopover, debounceClosePopover, handleOpenPopover, debounceOpenPopover, handleClosePopover,
+  } = useOutlinePopover({
+    onOpenDrawer, openDrawer, onCloseDrawer,
+  });
+  const isMobile = useMemo(() => {
+    return getPlatform().isMobile;
   }, []);
-
-  const handleOpenPopover = useCallback(() => {
-    debounceClosePopover.cancel();
-    if (openDrawer) {
-      return;
-    }
-
-    setOpenPopover(true);
-  }, [openDrawer, debounceClosePopover]);
+  const viewId = viewMeta?.view_id;
+  const rendered = usePublishContext()?.rendered;
 
   return (
     <div
       style={{
         backdropFilter: 'saturate(180%) blur(16px)',
-        background: 'var(--header)',
+        background: 'var(--bg-header)',
         height: HEADER_HEIGHT,
+        minHeight: HEADER_HEIGHT,
       }}
-      className={'appflowy-top-bar sticky top-0 z-10 flex px-5'}
+      className={'appflowy-top-bar transform-gpu sticky top-0 z-10 flex px-5'}
     >
-      <div className={'flex w-full items-center justify-between gap-2 overflow-hidden'}>
-        {!openDrawer && openPopover && (
+      <div className={'flex w-full items-center justify-between gap-4 overflow-hidden'}>
+        {!openDrawer && !isMobile && (
+
           <OutlinePopover
-            onMouseEnter={handleOpenPopover}
-            onMouseLeave={debounceClosePopover}
+            {...{
+              onMouseEnter: handleOpenPopover,
+              onMouseLeave: debounceClosePopover,
+            }}
             open={openPopover}
             onClose={debounceClosePopover}
+            drawerWidth={drawerWidth}
+            content={<Outline
+              variant={UIVariant.Publish} selectedViewId={viewId} navigateToView={toView} outline={outline}
+              width={drawerWidth}
+            />}
+            variant={UIVariant.Publish}
           >
             <IconButton
-              className={'hidden'}
-              onClick={() => {
-                setOpenPopover(false);
-                onOpenDrawer();
+              {...{
+                onMouseEnter: debounceOpenPopover,
+                onMouseLeave: debounceClosePopover,
+                onClick: () => {
+                  handleClosePopover();
+                  onOpenDrawer();
+                },
               }}
-              onMouseEnter={handleOpenPopover}
-              onMouseLeave={debounceClosePopover}
+
             >
-              <SideOutlined className={'h-4 w-4'} />
+              <SideOutlined className={'h-4 w-4 text-text-caption'} />
             </IconButton>
           </OutlinePopover>
         )}
 
         <div className={'h-full flex-1 overflow-hidden'}>
-          <Breadcrumb crumbs={crumbs} />
+          {!viewMeta ? <div className={'h-[48px] flex items-center'}><BreadcrumbSkeleton /></div> : <Breadcrumb
+            toView={toView}
+            crumbs={crumbs || []}
+            variant={UIVariant.Publish}
+          />}
         </div>
 
         <div className={'flex items-center gap-2'}>
-          <MoreActions />
-          {/*<Duplicate />*/}
-          <Divider orientation={'vertical'} className={'mx-2'} flexItem />
-          <Tooltip title={t('publish.downloadApp')}>
-            <button onClick={openOrDownload}>
-              <Logo className={'h-6 w-6'} />
-            </button>
-          </Tooltip>
+          {rendered && <Suspense fallback={null}>
+            <RightMenu />
+          </Suspense>}
+
         </div>
       </div>
     </div>

@@ -1,3 +1,8 @@
+import 'package:appflowy/plugins/database/domain/sort_service.dart';
+import 'package:appflowy/plugins/database/grid/application/grid_bloc.dart';
+import 'package:appflowy/workspace/presentation/widgets/dialogs.dart';
+import 'package:flutter/material.dart';
+
 import 'package:appflowy/generated/flowy_svgs.g.dart';
 import "package:appflowy/generated/locale_keys.g.dart";
 import 'package:appflowy/plugins/database/application/cell/cell_controller.dart';
@@ -11,16 +16,16 @@ import 'package:appflowy_popover/appflowy_popover.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flowy_infra/theme_extension.dart';
 import 'package:flowy_infra_ui/flowy_infra_ui.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../widgets/row/accessory/cell_accessory.dart';
 import '../../../../widgets/row/cells/cell_container.dart';
 import '../../layout/sizes.dart';
+
 import 'action.dart';
 
-class GridRow extends StatefulWidget {
+class GridRow extends StatelessWidget {
   const GridRow({
     super.key,
     required this.fieldController,
@@ -29,8 +34,7 @@ class GridRow extends StatefulWidget {
     required this.rowController,
     required this.cellBuilder,
     required this.openDetailPage,
-    this.index,
-    this.isDraggable = false,
+    required this.index,
   });
 
   final FieldController fieldController;
@@ -39,35 +43,29 @@ class GridRow extends StatefulWidget {
   final RowController rowController;
   final EditableCellBuilder cellBuilder;
   final void Function(BuildContext context) openDetailPage;
-  final int? index;
-  final bool isDraggable;
+  final int index;
 
-  @override
-  State<GridRow> createState() => _GridRowState();
-}
-
-class _GridRowState extends State<GridRow> {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
       create: (_) => RowBloc(
-        fieldController: widget.fieldController,
-        rowId: widget.rowId,
-        rowController: widget.rowController,
-        viewId: widget.viewId,
+        fieldController: fieldController,
+        rowId: rowId,
+        rowController: rowController,
+        viewId: viewId,
       ),
       child: _RowEnterRegion(
         child: Row(
           children: [
             _RowLeading(
-              index: widget.index,
-              isDraggable: widget.isDraggable,
+              viewId: viewId,
+              index: index,
             ),
             Expanded(
               child: RowContent(
-                fieldController: widget.fieldController,
-                cellBuilder: widget.cellBuilder,
-                onExpand: () => widget.openDetailPage(context),
+                fieldController: fieldController,
+                cellBuilder: cellBuilder,
+                onExpand: () => openDetailPage(context),
               ),
             ),
           ],
@@ -79,12 +77,12 @@ class _GridRowState extends State<GridRow> {
 
 class _RowLeading extends StatefulWidget {
   const _RowLeading({
-    this.index,
-    this.isDraggable = false,
+    required this.viewId,
+    required this.index,
   });
 
-  final int? index;
-  final bool isDraggable;
+  final String viewId;
+  final int index;
 
   @override
   State<_RowLeading> createState() => _RowLeadingState();
@@ -103,9 +101,12 @@ class _RowLeadingState extends State<_RowLeading> {
       margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
       popupBuilder: (_) {
         final bloc = context.read<RowBloc>();
-        return RowActionMenu(
-          viewId: bloc.viewId,
-          rowId: bloc.rowId,
+        return BlocProvider.value(
+          value: context.read<GridBloc>(),
+          child: RowActionMenu(
+            viewId: bloc.viewId,
+            rowId: bloc.rowId,
+          ),
         );
       },
       child: Consumer<RegionStateNotifier>(
@@ -125,28 +126,25 @@ class _RowLeadingState extends State<_RowLeading> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
-        const InsertRowButton(),
-        if (isDraggable)
-          ReorderableDragStartListener(
-            index: widget.index!,
-            child: RowMenuButton(
-              isDragEnabled: isDraggable,
-              openMenu: popoverController.show,
-            ),
-          )
-        else
-          RowMenuButton(
+        InsertRowButton(viewId: widget.viewId),
+        ReorderableDragStartListener(
+          index: widget.index,
+          child: RowMenuButton(
             openMenu: popoverController.show,
           ),
+        ),
       ],
     );
   }
-
-  bool get isDraggable => widget.index != null && widget.isDraggable;
 }
 
 class InsertRowButton extends StatelessWidget {
-  const InsertRowButton({super.key});
+  const InsertRowButton({
+    super.key,
+    required this.viewId,
+  });
+
+  final String viewId;
 
   @override
   Widget build(BuildContext context) {
@@ -155,7 +153,28 @@ class InsertRowButton extends StatelessWidget {
       hoverColor: AFThemeExtension.of(context).lightGreyHover,
       width: 20,
       height: 30,
-      onPressed: () => context.read<RowBloc>().add(const RowEvent.createRow()),
+      onPressed: () {
+        final rowBloc = context.read<RowBloc>();
+        if (context.read<GridBloc>().state.sorts.isNotEmpty) {
+          showCancelAndDeleteDialog(
+            context: context,
+            title: LocaleKeys.grid_sort_sortsActive.tr(
+              namedArgs: {
+                'intention': LocaleKeys.grid_row_createRowBelowDescription.tr(),
+              },
+            ),
+            description: LocaleKeys.grid_sort_removeSorting.tr(),
+            confirmLabel: LocaleKeys.button_remove.tr(),
+            closeOnAction: true,
+            onDelete: () {
+              SortBackendService(viewId: viewId).deleteAllSorts();
+              rowBloc.add(const RowEvent.createRow());
+            },
+          );
+        } else {
+          rowBloc.add(const RowEvent.createRow());
+        }
+      },
       iconPadding: const EdgeInsets.all(3),
       icon: FlowySvg(
         FlowySvgs.add_s,
@@ -169,11 +188,9 @@ class RowMenuButton extends StatefulWidget {
   const RowMenuButton({
     super.key,
     required this.openMenu,
-    this.isDragEnabled = false,
   });
 
   final VoidCallback openMenu;
-  final bool isDragEnabled;
 
   @override
   State<RowMenuButton> createState() => _RowMenuButtonState();
@@ -183,16 +200,18 @@ class _RowMenuButtonState extends State<RowMenuButton> {
   @override
   Widget build(BuildContext context) {
     return FlowyIconButton(
-      tooltipText:
-          widget.isDragEnabled ? null : LocaleKeys.tooltip_openMenu.tr(),
-      richTooltipText: widget.isDragEnabled
-          ? TextSpan(
-              children: [
-                TextSpan(text: '${LocaleKeys.tooltip_dragRow.tr()}\n'),
-                TextSpan(text: LocaleKeys.tooltip_openMenu.tr()),
-              ],
-            )
-          : null,
+      richTooltipText: TextSpan(
+        children: [
+          TextSpan(
+            text: '${LocaleKeys.tooltip_dragRow.tr()}\n',
+            style: context.tooltipTextStyle(),
+          ),
+          TextSpan(
+            text: LocaleKeys.tooltip_openMenu.tr(),
+            style: context.tooltipTextStyle(),
+          ),
+        ],
+      ),
       hoverColor: AFThemeExtension.of(context).lightGreyHover,
       width: 20,
       height: 30,
@@ -280,11 +299,11 @@ class RowContent extends StatelessWidget {
     return MouseRegion(
       cursor: SystemMouseCursors.basic,
       child: Container(
-        width: GridSize.trailHeaderPadding,
-        constraints: const BoxConstraints(minHeight: 46),
+        width: GridSize.newPropertyButtonWidth,
+        constraints: const BoxConstraints(minHeight: 36),
         decoration: BoxDecoration(
           border: Border(
-            bottom: BorderSide(color: Theme.of(context).dividerColor),
+            bottom: BorderSide(color: AFThemeExtension.of(context).borderColor),
           ),
         ),
       ),

@@ -1,12 +1,14 @@
+import 'package:flowy_infra/theme_extension.dart';
 import 'package:flutter/material.dart';
+
 import 'package:provider/provider.dart';
 import 'package:styled_widget/styled_widget.dart';
 
 import '../../../grid/presentation/layout/sizes.dart';
 import '../../../grid/presentation/widgets/row/row.dart';
+import '../../cell/editable_cell_builder.dart';
 import '../accessory/cell_accessory.dart';
 import '../accessory/cell_shortcuts.dart';
-import '../../cell/editable_cell_builder.dart';
 
 class CellContainer extends StatelessWidget {
   const CellContainer({
@@ -56,7 +58,7 @@ class CellContainer extends StatelessWidget {
               }
             },
             child: Container(
-              constraints: BoxConstraints(maxWidth: width, minHeight: 46),
+              constraints: BoxConstraints(maxWidth: width, minHeight: 36),
               decoration: _makeBoxDecoration(context, isFocus),
               child: container,
             ),
@@ -75,7 +77,8 @@ class CellContainer extends StatelessWidget {
       return BoxDecoration(border: Border.fromBorderSide(borderSide));
     }
 
-    final borderSide = BorderSide(color: Theme.of(context).dividerColor);
+    final borderSide =
+        BorderSide(color: AFThemeExtension.of(context).borderColor);
     return BoxDecoration(
       border: Border(right: borderSide, bottom: borderSide),
     );

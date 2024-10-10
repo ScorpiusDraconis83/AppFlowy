@@ -37,6 +37,14 @@ class RowBackendService {
     return DatabaseEventCreateRow(payload).send();
   }
 
+  Future<FlowyResult<void, FlowyError>> initRow(RowId rowId) async {
+    final payload = DatabaseViewRowIdPB()
+      ..viewId = viewId
+      ..rowId = rowId;
+
+    return DatabaseEventInitRow(payload).send();
+  }
+
   Future<FlowyResult<RowMetaPB, FlowyError>> createRowBefore(RowId rowId) {
     return createRow(
       viewId: viewId,
@@ -57,7 +65,7 @@ class RowBackendService {
     required String viewId,
     required String rowId,
   }) {
-    final payload = RowIdPB()
+    final payload = DatabaseViewRowIdPB()
       ..viewId = viewId
       ..rowId = rowId;
 
@@ -65,7 +73,7 @@ class RowBackendService {
   }
 
   Future<FlowyResult<RowMetaPB, FlowyError>> getRowMeta(RowId rowId) {
-    final payload = RowIdPB.create()
+    final payload = DatabaseViewRowIdPB.create()
       ..viewId = viewId
       ..rowId = rowId;
 
@@ -75,7 +83,7 @@ class RowBackendService {
   Future<FlowyResult<void, FlowyError>> updateMeta({
     required String rowId,
     String? iconURL,
-    String? coverURL,
+    RowCoverPB? cover,
     bool? isDocumentEmpty,
   }) {
     final payload = UpdateRowMetaChangesetPB.create()
@@ -85,8 +93,8 @@ class RowBackendService {
     if (iconURL != null) {
       payload.iconUrl = iconURL;
     }
-    if (coverURL != null) {
-      payload.coverUrl = coverURL;
+    if (cover != null) {
+      payload.cover = cover;
     }
 
     if (isDocumentEmpty != null) {
@@ -94,6 +102,14 @@ class RowBackendService {
     }
 
     return DatabaseEventUpdateRowMeta(payload).send();
+  }
+
+  Future<FlowyResult<void, FlowyError>> removeCover(String rowId) async {
+    final payload = RemoveCoverPayloadPB.create()
+      ..viewId = viewId
+      ..rowId = rowId;
+
+    return DatabaseEventRemoveCover(payload).send();
   }
 
   static Future<FlowyResult<void, FlowyError>> deleteRows(
@@ -111,7 +127,7 @@ class RowBackendService {
     String viewId,
     RowId rowId,
   ) {
-    final payload = RowIdPB(
+    final payload = DatabaseViewRowIdPB(
       viewId: viewId,
       rowId: rowId,
     );

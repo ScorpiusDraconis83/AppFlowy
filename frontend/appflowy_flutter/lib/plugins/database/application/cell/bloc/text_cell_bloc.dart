@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:appflowy/plugins/database/application/cell/cell_controller_builder.dart';
 import 'package:appflowy/plugins/database/application/field/field_info.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
@@ -33,7 +34,7 @@ class TextCellBloc extends Bloc<TextCellEvent, TextCellState> {
     on<TextCellEvent>(
       (event, emit) {
         event.when(
-          didReceiveCellUpdate: (String content) {
+          didReceiveCellUpdate: (content) {
             emit(state.copyWith(content: content));
           },
           didUpdateField: (fieldInfo) {
@@ -42,11 +43,10 @@ class TextCellBloc extends Bloc<TextCellEvent, TextCellState> {
               emit(state.copyWith(wrap: wrap));
             }
           },
-          didUpdateEmoji: (String emoji) {
-            emit(state.copyWith(emoji: emoji));
-          },
           updateText: (String text) {
-            if (state.content != text) {
+            // If the content is null, it indicates that either the cell is empty (no data)
+            // or the cell data is still being fetched from the backend and is not yet available.
+            if (state.content != null && state.content != text) {
               cellController.saveCellData(text, debounce: true);
             }
           },
@@ -62,17 +62,10 @@ class TextCellBloc extends Bloc<TextCellEvent, TextCellState> {
     _onCellChangedFn = cellController.addListener(
       onCellChanged: (cellContent) {
         if (!isClosed) {
-          add(TextCellEvent.didReceiveCellUpdate(cellContent ?? ""));
+          add(TextCellEvent.didReceiveCellUpdate(cellContent));
         }
       },
       onFieldChanged: _onFieldChangedListener,
-      onRowMetaChanged: cellController.fieldInfo.isPrimary
-          ? () {
-              if (!isClosed) {
-                add(TextCellEvent.didUpdateEmoji(cellController.icon ?? ""));
-              }
-            }
-          : null,
     );
   }
 
@@ -85,34 +78,39 @@ class TextCellBloc extends Bloc<TextCellEvent, TextCellState> {
 
 @freezed
 class TextCellEvent with _$TextCellEvent {
-  const factory TextCellEvent.didReceiveCellUpdate(String cellContent) =
+  const factory TextCellEvent.didReceiveCellUpdate(String? cellContent) =
       _DidReceiveCellUpdate;
   const factory TextCellEvent.didUpdateField(FieldInfo fieldInfo) =
       _DidUpdateField;
   const factory TextCellEvent.updateText(String text) = _UpdateText;
   const factory TextCellEvent.enableEdit(bool enabled) = _EnableEdit;
-  const factory TextCellEvent.didUpdateEmoji(String emoji) = _UpdateEmoji;
 }
 
 @freezed
 class TextCellState with _$TextCellState {
   const factory TextCellState({
-    required String content,
-    required String emoji,
+    required String? content,
+    required ValueNotifier<String>? emoji,
+    required ValueNotifier<bool>? hasDocument,
     required bool enableEdit,
     required bool wrap,
   }) = _TextCellState;
 
   factory TextCellState.initial(TextCellController cellController) {
-    final cellData = cellController.getCellData() ?? "";
+    final cellData = cellController.getCellData();
     final wrap = cellController.fieldInfo.wrapCellContent ?? true;
-    final emoji =
-        cellController.fieldInfo.isPrimary ? cellController.icon ?? "" : "";
+    ValueNotifier<String>? emoji;
+    ValueNotifier<bool>? hasDocument;
+    if (cellController.fieldInfo.isPrimary) {
+      emoji = cellController.icon;
+      hasDocument = cellController.hasDocument;
+    }
 
     return TextCellState(
       content: cellData,
       emoji: emoji,
       enableEdit: false,
+      hasDocument: hasDocument,
       wrap: wrap,
     );
   }

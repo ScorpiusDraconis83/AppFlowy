@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::str::FromStr;
 
+use collab_database::fields::media_type_option::MediaCellData;
+use collab_database::fields::select_type_option::SelectOptionIds;
 use collab_database::fields::Field;
 use collab_database::rows::{get_field_type_from_cell, Cell, Cells};
 
@@ -170,13 +172,15 @@ pub fn insert_checkbox_cell(is_checked: bool, field: &Field) -> Cell {
 
 pub fn insert_date_cell(
   timestamp: i64,
-  time: Option<String>,
+  start_time: Option<String>,
+  end_timestamp: Option<i64>,
   include_time: Option<bool>,
   field: &Field,
 ) -> Cell {
   let cell_data = DateCellChangeset {
     date: Some(timestamp),
-    time,
+    time: start_time,
+    end_date: end_timestamp,
     include_time,
     ..Default::default()
   };
@@ -188,9 +192,12 @@ pub fn insert_select_option_cell(option_ids: Vec<String>, field: &Field) -> Cell
   apply_cell_changeset(BoxAny::new(changeset), None, field, None).unwrap()
 }
 
-pub fn insert_checklist_cell(insert_options: Vec<(String, bool)>, field: &Field) -> Cell {
+pub fn insert_checklist_cell(
+  insert_options: Vec<ChecklistCellInsertChangeset>,
+  field: &Field,
+) -> Cell {
   let changeset = ChecklistCellChangeset {
-    insert_options,
+    insert_tasks: insert_options,
     ..Default::default()
   };
   apply_cell_changeset(BoxAny::new(changeset), None, field, None).unwrap()
@@ -219,7 +226,7 @@ impl<'a> CellBuilder<'a> {
       if let Some(field) = field_maps.get(&field_id) {
         let field_type = FieldType::from(field.field_type);
         match field_type {
-          FieldType::RichText => {
+          FieldType::RichText | FieldType::Translate | FieldType::Summary => {
             cells.insert(field_id, insert_text_cell(cell_str, field));
           },
           FieldType::Number | FieldType::Time => {
@@ -231,7 +238,7 @@ impl<'a> CellBuilder<'a> {
             if let Ok(timestamp) = cell_str.parse::<i64>() {
               cells.insert(
                 field_id,
-                insert_date_cell(timestamp, None, Some(false), field),
+                insert_date_cell(timestamp, None, None, Some(false), field),
               );
             }
           },
@@ -259,11 +266,8 @@ impl<'a> CellBuilder<'a> {
           FieldType::Relation => {
             cells.insert(field_id, (&RelationCellData::from(cell_str)).into());
           },
-          FieldType::Summary => {
-            cells.insert(field_id, insert_text_cell(cell_str, field));
-          },
-          FieldType::Translate => {
-            cells.insert(field_id, insert_text_cell(cell_str, field));
+          FieldType::Media => {
+            cells.insert(field_id, MediaCellData::from(cell_str).into());
           },
         }
       }
@@ -332,7 +336,7 @@ impl<'a> CellBuilder<'a> {
       Some(field) => {
         self.cells.insert(
           field_id.to_owned(),
-          insert_date_cell(timestamp, time, include_time, field),
+          insert_date_cell(timestamp, time, None, include_time, field),
         );
       },
     }
@@ -349,13 +353,17 @@ impl<'a> CellBuilder<'a> {
       },
     }
   }
-  pub fn insert_checklist_cell(&mut self, field_id: &str, options: Vec<(String, bool)>) {
+  pub fn insert_checklist_cell(
+    &mut self,
+    field_id: &str,
+    new_tasks: Vec<ChecklistCellInsertChangeset>,
+  ) {
     match self.field_maps.get(&field_id.to_owned()) {
       None => tracing::warn!("Can't find the field with id: {}", field_id),
       Some(field) => {
         self
           .cells
-          .insert(field_id.to_owned(), insert_checklist_cell(options, field));
+          .insert(field_id.to_owned(), insert_checklist_cell(new_tasks, field));
       },
     }
   }

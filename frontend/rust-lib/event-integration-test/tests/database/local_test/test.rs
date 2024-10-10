@@ -5,9 +5,10 @@ use bytes::Bytes;
 use event_integration_test::event_builder::EventBuilder;
 use event_integration_test::EventIntegrationTest;
 use flowy_database2::entities::{
-  CellChangesetPB, CellIdPB, CheckboxCellDataPB, ChecklistCellDataChangesetPB, DatabaseLayoutPB,
-  DatabaseSettingChangesetPB, DatabaseViewIdPB, DateCellChangesetPB, FieldType,
-  OrderObjectPositionPB, RelationCellChangesetPB, SelectOptionCellDataPB, UpdateRowMetaChangesetPB,
+  CellChangesetPB, CellIdPB, CheckboxCellDataPB, ChecklistCellDataChangesetPB,
+  ChecklistCellInsertPB, DatabaseLayoutPB, DatabaseSettingChangesetPB, DatabaseViewIdPB,
+  DateCellChangesetPB, FieldType, OrderObjectPositionPB, RelationCellChangesetPB,
+  SelectOptionCellDataPB, UpdateRowMetaChangesetPB,
 };
 use lib_infra::util::timestamp;
 
@@ -245,7 +246,7 @@ async fn get_row_event_test() {
   assert!(row.is_some());
 
   let row = test.get_row_meta(&grid_view.id, &database.rows[0].id).await;
-  assert!(!row.document_id.is_empty());
+  assert!(row.document_id.is_some());
 }
 
 #[tokio::test]
@@ -266,8 +267,9 @@ async fn update_row_meta_event_with_url_test() {
     id: database.rows[0].id.clone(),
     view_id: grid_view.id.clone(),
     icon_url: Some("icon_url".to_owned()),
-    cover_url: None,
+    cover: None,
     is_document_empty: None,
+    attachment_count: None,
   };
   let error = test.update_row_meta(changeset).await;
   assert!(error.is_none());
@@ -288,22 +290,23 @@ async fn update_row_meta_event_with_cover_test() {
 
   // By default the row icon is None.
   let row = test.get_row_meta(&grid_view.id, &database.rows[0].id).await;
-  assert_eq!(row.cover, None);
+  assert_eq!(row.icon, None);
 
   // Insert cover to the row.
   let changeset = UpdateRowMetaChangesetPB {
     id: database.rows[0].id.clone(),
     view_id: grid_view.id.clone(),
-    cover_url: Some("cover url".to_owned()),
-    icon_url: None,
+    icon_url: Some("cover url".to_owned()),
+    cover: None,
     is_document_empty: None,
+    attachment_count: None,
   };
   let error = test.update_row_meta(changeset).await;
   assert!(error.is_none());
 
   // Check if the icon is updated.
   let row = test.get_row_meta(&grid_view.id, &database.rows[0].id).await;
-  assert_eq!(row.cover, Some("cover url".to_owned()));
+  assert_eq!(row.icon, Some("cover url".to_owned()));
 }
 
 #[tokio::test]
@@ -618,17 +621,29 @@ async fn update_checklist_cell_test() {
 
   // update the checklist cell
   let changeset = ChecklistCellDataChangesetPB {
-    view_id: grid_view.id.clone(),
-    row_id: database.rows[0].id.clone(),
-    field_id: checklist_field.id.clone(),
-    insert_options: vec![
-      "task 1".to_string(),
-      "task 2".to_string(),
-      "task 3".to_string(),
+    cell_id: CellIdPB {
+      view_id: grid_view.id.clone(),
+      row_id: database.rows[0].id.clone(),
+      field_id: checklist_field.id.clone(),
+    },
+    insert_task: vec![
+      ChecklistCellInsertPB {
+        name: "task 1".to_string(),
+        index: None,
+      },
+      ChecklistCellInsertPB {
+        name: "task 2".to_string(),
+        index: None,
+      },
+      ChecklistCellInsertPB {
+        name: "task 3".to_string(),
+        index: None,
+      },
     ],
-    selected_option_ids: vec![],
-    delete_option_ids: vec![],
-    update_options: vec![],
+    completed_tasks: vec![],
+    delete_tasks: vec![],
+    update_tasks: vec![],
+    reorder: "".to_string(),
   };
   test.update_checklist_cell(changeset).await;
 
@@ -642,10 +657,12 @@ async fn update_checklist_cell_test() {
 
   // select some options
   let changeset = ChecklistCellDataChangesetPB {
-    view_id: grid_view.id.clone(),
-    row_id: database.rows[0].id.clone(),
-    field_id: checklist_field.id.clone(),
-    selected_option_ids: vec![cell.options[0].id.clone(), cell.options[1].id.clone()],
+    cell_id: CellIdPB {
+      view_id: grid_view.id.clone(),
+      row_id: database.rows[0].id.clone(),
+      field_id: checklist_field.id.clone(),
+    },
+    completed_tasks: vec![cell.options[0].id.clone(), cell.options[1].id.clone()],
     ..Default::default()
   };
   test.update_checklist_cell(changeset).await;

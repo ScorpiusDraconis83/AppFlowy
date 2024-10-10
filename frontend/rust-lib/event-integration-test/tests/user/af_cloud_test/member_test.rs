@@ -1,5 +1,5 @@
 use crate::user::af_cloud_test::util::get_synced_workspaces;
-use event_integration_test::user_event::user_localhost_af_cloud;
+use event_integration_test::user_event::use_localhost_af_cloud;
 use event_integration_test::EventIntegrationTest;
 
 #[tokio::test]
@@ -35,22 +35,21 @@ async fn af_cloud_invite_workspace_member() {
 
 #[tokio::test]
 async fn af_cloud_add_workspace_member_test() {
-  user_localhost_af_cloud().await;
+  use_localhost_af_cloud().await;
   let test_1 = EventIntegrationTest::new().await;
   let user_1 = test_1.af_cloud_sign_up().await;
+  let workspace_id_1 = test_1.get_current_workspace().await.id;
 
   let test_2 = EventIntegrationTest::new().await;
   let user_2 = test_2.af_cloud_sign_up().await;
 
-  let members = test_1.get_workspace_members(&user_1.workspace_id).await;
+  let members = test_1.get_workspace_members(&workspace_id_1).await;
   assert_eq!(members.len(), 1);
   assert_eq!(members[0].email, user_1.email);
 
-  test_1
-    .add_workspace_member(&user_1.workspace_id, &test_2)
-    .await;
+  test_1.add_workspace_member(&workspace_id_1, &test_2).await;
 
-  let members = test_1.get_workspace_members(&user_1.workspace_id).await;
+  let members = test_1.get_workspace_members(&workspace_id_1).await;
   assert_eq!(members.len(), 2);
   assert_eq!(members[0].email, user_1.email);
   assert_eq!(members[1].email, user_2.email);
@@ -58,45 +57,43 @@ async fn af_cloud_add_workspace_member_test() {
 
 #[tokio::test]
 async fn af_cloud_delete_workspace_member_test() {
-  user_localhost_af_cloud().await;
+  use_localhost_af_cloud().await;
   let test_1 = EventIntegrationTest::new().await;
   let user_1 = test_1.af_cloud_sign_up().await;
+  let workspace_id_1 = test_1.get_current_workspace().await.id;
 
   let test_2 = EventIntegrationTest::new().await;
   let user_2 = test_2.af_cloud_sign_up().await;
 
-  test_1
-    .add_workspace_member(&user_1.workspace_id, &test_2)
-    .await;
+  test_1.add_workspace_member(&workspace_id_1, &test_2).await;
 
   test_1
-    .delete_workspace_member(&user_1.workspace_id, &user_2.email)
+    .delete_workspace_member(&workspace_id_1, &user_2.email)
     .await;
 
-  let members = test_1.get_workspace_members(&user_1.workspace_id).await;
+  let members = test_1.get_workspace_members(&workspace_id_1).await;
   assert_eq!(members.len(), 1);
   assert_eq!(members[0].email, user_1.email);
 }
 
 #[tokio::test]
 async fn af_cloud_leave_workspace_test() {
-  user_localhost_af_cloud().await;
+  use_localhost_af_cloud().await;
   let test_1 = EventIntegrationTest::new().await;
-  let user_1 = test_1.af_cloud_sign_up().await;
+  test_1.af_cloud_sign_up().await;
+  let workspace_id_1 = test_1.get_current_workspace().await.id;
 
   let test_2 = EventIntegrationTest::new().await;
   let user_2 = test_2.af_cloud_sign_up().await;
 
-  test_1
-    .add_workspace_member(&user_1.workspace_id, &test_2)
-    .await;
+  test_1.add_workspace_member(&workspace_id_1, &test_2).await;
 
   // test_2 should have 2 workspace
   let workspaces = get_synced_workspaces(&test_2, user_2.id).await;
   assert_eq!(workspaces.len(), 2);
 
   // user_2 leaves the workspace
-  test_2.leave_workspace(&user_1.workspace_id).await;
+  test_2.leave_workspace(&workspace_id_1).await;
 
   // user_2 should have 1 workspace
   let workspaces = get_synced_workspaces(&test_2, user_2.id).await;

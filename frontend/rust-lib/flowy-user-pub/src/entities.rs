@@ -140,7 +140,7 @@ pub struct UserWorkspace {
   pub created_at: DateTime<Utc>,
   /// The database storage id is used indexing all the database views in current workspace.
   #[serde(rename = "database_storage_id")]
-  pub database_indexer_id: String,
+  pub workspace_database_id: String,
   #[serde(default)]
   pub icon: String,
 }
@@ -151,7 +151,7 @@ impl UserWorkspace {
       id: workspace_id.to_string(),
       name: "".to_string(),
       created_at: Utc::now(),
-      database_indexer_id: Uuid::new_v4().to_string(),
+      workspace_database_id: Uuid::new_v4().to_string(),
       icon: "".to_string(),
     }
   }
@@ -167,7 +167,6 @@ pub struct UserProfile {
   pub icon_url: String,
   pub openai_key: String,
   pub stability_ai_key: String,
-  pub workspace_id: String,
   pub authenticator: Authenticator,
   // If the encryption_sign is not empty, which means the user has enabled the encryption.
   pub encryption_type: EncryptionType,
@@ -246,7 +245,6 @@ where
       token: value.user_token().unwrap_or_default(),
       icon_url,
       openai_key,
-      workspace_id: value.latest_workspace().id.to_owned(),
       authenticator: auth_type.clone(),
       encryption_type: value.encryption_type(),
       stability_ai_key,
@@ -346,8 +344,6 @@ pub enum Authenticator {
   /// Currently not supported. It will be supported in the future when the
   /// [AppFlowy-Server](https://github.com/AppFlowy-IO/AppFlowy-Server) ready.
   AppFlowyCloud = 1,
-  /// It uses Supabase as the backend.
-  Supabase = 2,
 }
 
 impl Default for Authenticator {
@@ -371,7 +367,6 @@ impl From<i32> for Authenticator {
     match value {
       0 => Authenticator::Local,
       1 => Authenticator::AppFlowyCloud,
-      2 => Authenticator::Supabase,
       _ => Authenticator::Local,
     }
   }

@@ -1,8 +1,11 @@
 import 'dart:async';
 
+import 'package:flutter/material.dart';
+
 import 'package:appflowy/generated/flowy_svgs.g.dart';
 import 'package:appflowy/generated/locale_keys.g.dart';
 import 'package:appflowy/plugins/document/application/document_appearance_cubit.dart';
+import 'package:appflowy/plugins/document/presentation/editor_style.dart';
 import 'package:appflowy/shared/af_role_pb_extension.dart';
 import 'package:appflowy/shared/google_fonts_extension.dart';
 import 'package:appflowy/util/font_family_extension.dart';
@@ -43,7 +46,6 @@ import 'package:flowy_infra/theme.dart';
 import 'package:flowy_infra/theme_extension.dart';
 import 'package:flowy_infra_ui/flowy_infra_ui.dart';
 import 'package:flowy_infra_ui/style_widget/hover.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -124,6 +126,7 @@ class SettingsWorkspaceView extends StatelessWidget {
                   _ThemeDropdown(),
                   _DocumentCursorColorSetting(),
                   _DocumentSelectionColorSetting(),
+                  DocumentPaddingSetting(),
                 ],
               ),
               const SettingsCategorySpacer(),
@@ -343,20 +346,18 @@ class _WorkspaceIconSetting extends StatelessWidget {
       );
     }
 
-    return Container(
+    return SizedBox(
       height: 64,
       width: 64,
-      decoration: BoxDecoration(
-        border: Border.all(color: Theme.of(context).colorScheme.outline),
-        borderRadius: BorderRadius.circular(8),
-      ),
       child: Padding(
         padding: const EdgeInsets.all(1),
         child: WorkspaceIcon(
           workspace: workspace!,
-          iconSize: workspace!.icon.isNotEmpty == true ? 46 : 20,
-          fontSize: 16.0,
-          figmaLineHeight: 46,
+          iconSize: 36,
+          emojiSize: 24.0,
+          fontSize: 24.0,
+          figmaLineHeight: 26.0,
+          borderRadius: 18.0,
           enableEdit: true,
           onSelected: (r) => context
               .read<WorkspaceSettingsBloc>()
@@ -625,7 +626,7 @@ class _ThemeDropdown extends StatelessWidget {
                     ),
                   ),
                 ).then((val) {
-                  if (val != null) {
+                  if (val != null && context.mounted) {
                     showSnackBarMessage(
                       context,
                       LocaleKeys.settings_appearance_themeUpload_uploadSuccess
@@ -1262,6 +1263,102 @@ class _SelectionColorValueWidget extends StatelessWidget {
           color: textColor,
         ),
       ],
+    );
+  }
+}
+
+class DocumentPaddingSetting extends StatelessWidget {
+  const DocumentPaddingSetting({
+    super.key,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<DocumentAppearanceCubit, DocumentAppearance>(
+      builder: (context, state) {
+        return Column(
+          children: [
+            Row(
+              children: [
+                FlowyText.medium(
+                  LocaleKeys.settings_appearance_documentSettings_width.tr(),
+                ),
+                const Spacer(),
+                SettingsResetButton(
+                  onResetRequested: () =>
+                      context.read<DocumentAppearanceCubit>().syncWidth(null),
+                ),
+              ],
+            ),
+            const VSpace(6),
+            Container(
+              height: 32,
+              padding: const EdgeInsets.only(right: 4),
+              child: _DocumentPaddingSlider(
+                onPaddingChanged: (value) {
+                  context.read<DocumentAppearanceCubit>().syncWidth(value);
+                },
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _DocumentPaddingSlider extends StatefulWidget {
+  const _DocumentPaddingSlider({
+    required this.onPaddingChanged,
+  });
+
+  final void Function(double) onPaddingChanged;
+
+  @override
+  State<_DocumentPaddingSlider> createState() => _DocumentPaddingSliderState();
+}
+
+class _DocumentPaddingSliderState extends State<_DocumentPaddingSlider> {
+  late double width;
+
+  @override
+  void initState() {
+    super.initState();
+
+    width = context.read<DocumentAppearanceCubit>().state.width;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<DocumentAppearanceCubit, DocumentAppearance>(
+      builder: (context, state) {
+        if (state.width != width) {
+          width = state.width;
+        }
+        return SliderTheme(
+          data: Theme.of(context).sliderTheme.copyWith(
+                showValueIndicator: ShowValueIndicator.never,
+                thumbShape: const RoundSliderThumbShape(
+                  enabledThumbRadius: 8,
+                ),
+                overlayShape: SliderComponentShape.noThumb,
+              ),
+          child: Slider(
+            value: width.clamp(
+              EditorStyleCustomizer.minDocumentWidth,
+              EditorStyleCustomizer.maxDocumentWidth,
+            ),
+            min: EditorStyleCustomizer.minDocumentWidth,
+            max: EditorStyleCustomizer.maxDocumentWidth,
+            divisions: 10,
+            onChanged: (value) {
+              setState(() => width = value);
+
+              widget.onPaddingChanged(value);
+            },
+          ),
+        );
+      },
     );
   }
 }

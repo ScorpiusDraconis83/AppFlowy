@@ -1,3 +1,4 @@
+import 'package:appflowy/generated/flowy_svgs.g.dart';
 import 'package:appflowy/plugins/database/application/cell/bloc/text_cell_bloc.dart';
 import 'package:appflowy/plugins/database/grid/presentation/layout/sizes.dart';
 import 'package:appflowy/plugins/database/widgets/row/cells/cell_container.dart';
@@ -19,34 +20,25 @@ class DesktopGridTextCellSkin extends IEditableTextCellSkin {
     return Padding(
       padding: GridSize.cellContentInsets,
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          BlocBuilder<TextCellBloc, TextCellState>(
-            buildWhen: (p, c) => p.emoji != c.emoji,
-            builder: (context, state) {
-              if (state.emoji.isEmpty) {
-                return const SizedBox.shrink();
-              }
-              return Center(
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    FlowyText(
-                      state.emoji,
-                      fontSize: 16,
-                    ),
-                    const HSpace(6),
-                  ],
-                ),
-              );
-            },
-          ),
+          const _IconOrEmoji(),
           Expanded(
             child: TextField(
               controller: textEditingController,
               focusNode: focusNode,
               maxLines: context.watch<TextCellBloc>().state.wrap ? null : 1,
-              style: Theme.of(context).textTheme.bodyMedium,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    fontWeight: context
+                            .read<TextCellBloc>()
+                            .cellController
+                            .fieldInfo
+                            .isPrimary
+                        ? FontWeight.w500
+                        : null,
+                  ),
               decoration: const InputDecoration(
+                contentPadding: EdgeInsets.only(top: 4),
                 border: InputBorder.none,
                 focusedBorder: InputBorder.none,
                 enabledBorder: InputBorder.none,
@@ -59,6 +51,51 @@ class DesktopGridTextCellSkin extends IEditableTextCellSkin {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _IconOrEmoji extends StatelessWidget {
+  const _IconOrEmoji();
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<TextCellBloc, TextCellState>(
+      builder: (context, state) {
+        // if not a title cell, return empty widget
+        if (state.emoji == null || state.hasDocument == null) {
+          return const SizedBox.shrink();
+        }
+
+        return ValueListenableBuilder<String>(
+          valueListenable: state.emoji!,
+          builder: (context, emoji, _) {
+            return emoji.isNotEmpty
+                ? Padding(
+                    padding: const EdgeInsetsDirectional.only(end: 6.0),
+                    child: FlowyText.emoji(
+                      optimizeEmojiAlign: true,
+                      emoji,
+                    ),
+                  )
+                : ValueListenableBuilder<bool>(
+                    valueListenable: state.hasDocument!,
+                    builder: (context, hasDocument, _) {
+                      return hasDocument
+                          ? Padding(
+                              padding:
+                                  const EdgeInsetsDirectional.only(end: 6.0),
+                              child: FlowySvg(
+                                FlowySvgs.notes_s,
+                                color: Theme.of(context).hintColor,
+                              ),
+                            )
+                          : const SizedBox.shrink();
+                    },
+                  );
+          },
+        );
+      },
     );
   }
 }

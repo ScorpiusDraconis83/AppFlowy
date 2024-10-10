@@ -1,6 +1,7 @@
 use async_trait::async_trait;
+use collab_database::fields::url_type_option::{URLCellData, URLTypeOption};
 use collab_database::fields::{Field, TypeOptionData};
-use collab_database::rows::{new_cell_builder, Cell, Cells, Row, RowDetail};
+use collab_database::rows::{new_cell_builder, Cell, Cells, Row};
 use serde::{Deserialize, Serialize};
 
 use flowy_error::FlowyResult;
@@ -9,7 +10,7 @@ use crate::entities::{
   FieldType, GroupPB, GroupRowsNotificationPB, InsertedGroupPB, InsertedRowPB, RowMetaPB,
 };
 use crate::services::cell::insert_url_cell;
-use crate::services::field::{TypeOption, URLCellData, URLCellDataParser, URLTypeOption};
+use crate::services::field::{TypeOption, URLCellDataParser};
 use crate::services::group::action::GroupCustomize;
 use crate::services::group::configuration::GroupControllerContext;
 use crate::services::group::controller::BaseGroupController;
@@ -27,15 +28,14 @@ pub type URLGroupController =
 
 pub type URLGroupControllerContext = GroupControllerContext<URLGroupConfiguration>;
 
+#[async_trait]
 impl GroupCustomize for URLGroupController {
   type GroupTypeOption = URLTypeOption;
 
   fn placeholder_cell(&self) -> Option<Cell> {
-    Some(
-      new_cell_builder(FieldType::URL)
-        .insert_str_value("data", "")
-        .build(),
-    )
+    let mut cell = new_cell_builder(FieldType::URL);
+    cell.insert("data".into(), "".into());
+    Some(cell)
   }
 
   fn can_group(
@@ -48,7 +48,7 @@ impl GroupCustomize for URLGroupController {
 
   fn create_or_delete_group_when_cell_changed(
     &mut self,
-    _row_detail: &RowDetail,
+    _row: &Row,
     _old_cell_data: Option<&<Self::GroupTypeOption as TypeOption>::CellProtobufType>,
     _cell_data: &<Self::GroupTypeOption as TypeOption>::CellProtobufType,
   ) -> FlowyResult<(Option<InsertedGroupPB>, Option<GroupPB>)> {
@@ -58,7 +58,7 @@ impl GroupCustomize for URLGroupController {
       let cell_data: URLCellData = _cell_data.clone().into();
       let group = Group::new(cell_data.data);
       let mut new_group = self.context.add_new_group(group)?;
-      new_group.group.rows.push(RowMetaPB::from(_row_detail));
+      new_group.group.rows.push(RowMetaPB::from(_row.clone()));
       inserted_group = Some(new_group);
     }
 
@@ -89,24 +89,22 @@ impl GroupCustomize for URLGroupController {
 
   fn add_or_remove_row_when_cell_changed(
     &mut self,
-    row_detail: &RowDetail,
+    row: &Row,
     cell_data: &<Self::GroupTypeOption as TypeOption>::CellProtobufType,
   ) -> Vec<GroupRowsNotificationPB> {
     let mut changesets = vec![];
     self.context.iter_mut_status_groups(|group| {
       let mut changeset = GroupRowsNotificationPB::new(group.id.clone());
       if group.id == cell_data.content {
-        if !group.contains_row(&row_detail.row.id) {
+        if !group.contains_row(&row.id) {
           changeset
             .inserted_rows
-            .push(InsertedRowPB::new(RowMetaPB::from(row_detail)));
-          group.add_row(row_detail.clone());
+            .push(InsertedRowPB::new(RowMetaPB::from(row)));
+          group.add_row(row.clone());
         }
-      } else if group.contains_row(&row_detail.row.id) {
-        group.remove_row(&row_detail.row.id);
-        changeset
-          .deleted_rows
-          .push(row_detail.row.id.clone().into_inner());
+      } else if group.contains_row(&row.id) {
+        group.remove_row(&row.id);
+        changeset.deleted_rows.push(row.id.clone().into_inner());
       }
 
       if !changeset.is_empty() {
@@ -157,7 +155,7 @@ impl GroupCustomize for URLGroupController {
     group_changeset
   }
 
-  fn delete_group_when_move_row(
+  fn delete_group_after_moving_row(
     &mut self,
     _row: &Row,
     cell_data: &<Self::GroupTypeOption as TypeOption>::CellProtobufType,
@@ -174,7 +172,7 @@ impl GroupCustomize for URLGroupController {
     deleted_group
   }
 
-  fn delete_group(&mut self, group_id: &str) -> FlowyResult<Option<TypeOptionData>> {
+  async fn delete_group(&mut self, group_id: &str) -> FlowyResult<Option<TypeOptionData>> {
     self.context.delete_group(group_id)?;
     Ok(None)
   }

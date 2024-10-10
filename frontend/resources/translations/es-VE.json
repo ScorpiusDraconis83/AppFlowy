@@ -382,11 +382,6 @@
       "cloudServerType": "servidor en la nube",
       "cloudServerTypeTip": "Tenga en cuenta que es posible que se cierre la sesión de su cuenta actual después de cambiar el servidor en la nube.",
       "cloudLocal": "Local",
-      "cloudSupabase": "Supabase",
-      "cloudSupabaseUrl": "URL de la base de datos",
-      "cloudSupabaseUrlCanNotBeEmpty": "La URL de supabase no puede estar vacía.",
-      "cloudSupabaseAnonKey": "Supabase clave anon",
-      "cloudSupabaseAnonKeyCanNotBeEmpty": "La clave anon no puede estar vacía si la URL de supabase no está vacía",
       "cloudAppFlowy": "Nube @:appName",
       "cloudAppFlowySelfHost": "@:appName Cloud autohospedado",
       "appFlowyCloudUrlCanNotBeEmpty": "La URL de la nube no puede estar vacía",
@@ -415,8 +410,7 @@
       "importAppFlowyDataDescription": "Copia los datos de una carpeta de datos externa de @:appName e impórtalos a la carpeta de datos actual de @:appName",
       "importSuccess": "Importó exitosamente la carpeta de datos de @:appName",
       "importFailed": "Error al importar la carpeta de datos de @:appName",
-      "importGuide": "Para obtener más detalles, consulte el documento de referencia.",
-      "supabaseSetting": "Ajuste de base superior"
+      "importGuide": "Para obtener más detalles, consulte el documento de referencia."
     },
     "notifications": {
       "enableNotifications": {
@@ -569,8 +563,8 @@
       "tooltipSelectIcon": "Seleccionar icono",
       "selectAnIcon": "Seleccione un icono",
       "pleaseInputYourOpenAIKey": "por favor ingrese su clave AI",
-      "pleaseInputYourStabilityAIKey": "por favor ingrese su clave de estabilidad AI",
-      "clickToLogout": "Haga clic para cerrar la sesión del usuario actual."
+      "clickToLogout": "Haga clic para cerrar la sesión del usuario actual.",
+      "pleaseInputYourStabilityAIKey": "por favor ingrese su clave de estabilidad AI"
     },
     "mobile": {
       "personalInfo": "Informacion personal",
@@ -1049,14 +1043,14 @@
       },
       "searchForAnImage": "Buscar una imagen",
       "pleaseInputYourOpenAIKey": "ingresa tu clave AI en la página de Configuración",
-      "pleaseInputYourStabilityAIKey": "ingresa tu clave de Stability AI en la página de configuración",
       "saveImageToGallery": "Guardar imagen",
       "failedToAddImageToGallery": "No se pudo agregar la imagen a la galería",
       "successToAddImageToGallery": "Imagen agregada a la galería con éxito",
       "unableToLoadImage": "No se puede cargar la imagen",
       "maximumImageSize": "El tamaño máximo de imagen es de 10 MB",
       "uploadImageErrorImageSizeTooBig": "El tamaño de la imagen debe ser inferior a 10 MB.",
-      "imageIsUploading": "La imagen se está subiendo"
+      "imageIsUploading": "La imagen se está subiendo",
+      "pleaseInputYourStabilityAIKey": "ingresa tu clave de Stability AI en la página de configuración"
     },
     "codeBlock": {
       "language": {

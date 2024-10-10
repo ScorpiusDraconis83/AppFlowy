@@ -1,5 +1,3 @@
-import 'package:flutter/material.dart';
-
 import 'package:appflowy/plugins/database/grid/presentation/widgets/common/type_option_separator.dart';
 import 'package:appflowy/plugins/database/widgets/field/type_option_editor/date/date_time_format.dart';
 import 'package:appflowy/workspace/presentation/widgets/date_picker/widgets/date_picker.dart';
@@ -8,9 +6,10 @@ import 'package:appflowy/workspace/presentation/widgets/date_picker/widgets/end_
 import 'package:appflowy/workspace/presentation/widgets/date_picker/widgets/reminder_selector.dart';
 import 'package:appflowy/workspace/presentation/widgets/date_picker/widgets/start_text_field.dart';
 import 'package:appflowy_backend/protobuf/flowy-database2/date_entities.pbenum.dart';
-import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:appflowy_popover/appflowy_popover.dart';
 import 'package:flowy_infra_ui/flowy_infra_ui.dart';
+import 'package:flutter/material.dart';
+import 'package:universal_platform/universal_platform.dart';
 
 class OptionGroup {
   OptionGroup({required this.options});
@@ -27,7 +26,7 @@ class AppFlowyDatePicker extends StatefulWidget {
   const AppFlowyDatePicker({
     super.key,
     required this.includeTime,
-    required this.onIncludeTimeChanged,
+    this.onIncludeTimeChanged,
     this.rebuildOnDaySelected = true,
     this.enableRanges = true,
     this.isRange = false,
@@ -51,6 +50,7 @@ class AppFlowyDatePicker extends StatefulWidget {
     this.onEndTimeSubmitted,
     this.onDaySelected,
     this.onRangeSelected,
+    this.enableReminder = true,
     this.onReminderSelected,
     this.options,
     this.allowFormatChanges = false,
@@ -62,7 +62,7 @@ class AppFlowyDatePicker extends StatefulWidget {
   });
 
   final bool includeTime;
-  final Function(bool) onIncludeTimeChanged;
+  final Function(bool)? onIncludeTimeChanged;
 
   final bool enableRanges;
   final bool isRange;
@@ -96,6 +96,8 @@ class AppFlowyDatePicker extends StatefulWidget {
   final TimeChangedCallback? onEndTimeSubmitted;
   final DaySelectedCallback? onDaySelected;
   final RangeSelectedCallback? onRangeSelected;
+
+  final bool enableReminder;
   final OnReminderSelected? onReminderSelected;
 
   /// A list of [OptionGroup] that will be rendered with proper
@@ -149,7 +151,7 @@ class _AppFlowyDatePickerState extends State<AppFlowyDatePicker> {
 
   @override
   Widget build(BuildContext context) =>
-      PlatformExtension.isMobile ? buildMobilePicker() : buildDesktopPicker();
+      UniversalPlatform.isMobile ? buildMobilePicker() : buildDesktopPicker();
 
   Widget buildMobilePicker() {
     return DatePicker(
@@ -222,7 +224,9 @@ class _AppFlowyDatePickerState extends State<AppFlowyDatePicker> {
               onCalendarCreated: widget.onCalendarCreated,
               onPageChanged: widget.onPageChanged,
             ),
-            const TypeOptionSeparator(spacing: 12.0),
+            if (widget.enableRanges && widget.onIsRangeChanged != null ||
+                widget.onIncludeTimeChanged != null)
+              const TypeOptionSeparator(spacing: 12.0),
             if (widget.enableRanges && widget.onIsRangeChanged != null) ...[
               EndTimeButton(
                 isRange: widget.isRange,
@@ -230,24 +234,27 @@ class _AppFlowyDatePickerState extends State<AppFlowyDatePicker> {
               ),
               const VSpace(4.0),
             ],
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12.0),
-              child: IncludeTimeButton(
-                value: widget.includeTime,
-                onChanged: widget.onIncludeTimeChanged,
+            if (widget.onIncludeTimeChanged != null)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                child: IncludeTimeButton(
+                  value: widget.includeTime,
+                  onChanged: widget.onIncludeTimeChanged!,
+                ),
               ),
-            ),
-            const _GroupSeparator(),
-            ReminderSelector(
-              mutex: widget.popoverMutex,
-              hasTime: widget.includeTime,
-              timeFormat: widget.timeFormat,
-              selectedOption: _selectedReminderOption,
-              onOptionSelected: (option) {
-                setState(() => _selectedReminderOption = option);
-                widget.onReminderSelected?.call(option);
-              },
-            ),
+            if (widget.enableReminder) ...[
+              const _GroupSeparator(),
+              ReminderSelector(
+                mutex: widget.popoverMutex,
+                hasTime: widget.includeTime,
+                timeFormat: widget.timeFormat,
+                selectedOption: _selectedReminderOption,
+                onOptionSelected: (option) {
+                  setState(() => _selectedReminderOption = option);
+                  widget.onReminderSelected?.call(option);
+                },
+              ),
+            ],
             if (widget.options?.isNotEmpty ?? false) ...[
               const _GroupSeparator(),
               ListView.separated(

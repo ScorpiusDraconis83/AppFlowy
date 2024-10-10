@@ -15,11 +15,13 @@ class ChatUserMessageBloc
           ),
         ) {
     on<ChatUserMessageEvent>(
-      (event, emit) async {
+      (event, emit) {
         event.when(
           initial: () {
             if (state.stream != null) {
-              add(ChatUserMessageEvent.updateText(state.stream!.text));
+              if (!isClosed) {
+                add(ChatUserMessageEvent.updateText(state.stream!.text));
+              }
             }
 
             state.stream?.listen(

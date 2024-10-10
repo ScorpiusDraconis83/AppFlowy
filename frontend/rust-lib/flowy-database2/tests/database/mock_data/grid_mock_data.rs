@@ -1,5 +1,15 @@
 use collab_database::database::{gen_database_id, gen_database_view_id, gen_row_id, DatabaseData};
-use collab_database::views::{DatabaseLayout, DatabaseView};
+use collab_database::entity::DatabaseView;
+use collab_database::fields::date_type_option::{
+  DateFormat, DateTypeOption, TimeFormat, TimeTypeOption,
+};
+use collab_database::fields::media_type_option::MediaTypeOption;
+use collab_database::fields::number_type_option::{NumberFormat, NumberTypeOption};
+use collab_database::fields::select_type_option::{
+  MultiSelectTypeOption, SelectOption, SelectOptionColor, SingleSelectTypeOption,
+};
+use collab_database::fields::timestamp_type_option::TimestampTypeOption;
+use collab_database::views::DatabaseLayout;
 use strum::IntoEnumIterator;
 
 use crate::database::mock_data::{COMPLETED, FACEBOOK, GOOGLE, PAUSED, PLANNED, TWITTER};
@@ -8,9 +18,7 @@ use flowy_database2::entities::FieldType;
 use flowy_database2::services::field::summary_type_option::summary::SummarizationTypeOption;
 use flowy_database2::services::field::translate_type_option::translate::TranslateTypeOption;
 use flowy_database2::services::field::{
-  ChecklistTypeOption, DateFormat, DateTypeOption, FieldBuilder, MultiSelectTypeOption,
-  NumberFormat, NumberTypeOption, RelationTypeOption, SelectOption, SelectOptionColor,
-  SingleSelectTypeOption, TimeFormat, TimeTypeOption, TimestampTypeOption,
+  ChecklistCellInsertChangeset, ChecklistTypeOption, FieldBuilder, RelationTypeOption,
 };
 use flowy_database2::services::field_settings::default_field_settings_for_fields;
 
@@ -58,7 +66,7 @@ pub fn make_test_grid() -> DatabaseData {
           date_format: DateFormat::US,
           time_format: TimeFormat::TwentyFourHour,
           include_time: true,
-          field_type,
+          field_type: field_type.into(),
         };
         let name = match field_type {
           FieldType::LastEditedTime => "Last Modified",
@@ -150,6 +158,16 @@ pub fn make_test_grid() -> DatabaseData {
           .build();
         fields.push(translate_field);
       },
+      FieldType::Media => {
+        let type_option = MediaTypeOption {
+          hide_file_names: false,
+        };
+
+        let media_field = FieldBuilder::new(field_type, type_option)
+          .name("Media")
+          .build();
+        fields.push(media_field);
+      },
     }
   }
 
@@ -173,7 +191,10 @@ pub fn make_test_grid() -> DatabaseData {
               row_builder.insert_url_cell("AppFlowy website - https://www.appflowy.io")
             },
             FieldType::Checklist => {
-              row_builder.insert_checklist_cell(vec![("First thing".to_string(), false)])
+              row_builder.insert_checklist_cell(vec![ChecklistCellInsertChangeset::new(
+                "First thing".to_string(),
+                false,
+              )])
             },
             FieldType::Time => row_builder.insert_time_cell(75),
             _ => "".to_owned(),
@@ -192,11 +213,11 @@ pub fn make_test_grid() -> DatabaseData {
               .insert_multi_select_cell(|mut options| vec![options.remove(0), options.remove(1)]),
             FieldType::Checkbox => row_builder.insert_checkbox_cell("true"),
             FieldType::Checklist => row_builder.insert_checklist_cell(vec![
-              ("Have breakfast".to_string(), true),
-              ("Have lunch".to_string(), true),
-              ("Take a nap".to_string(), false),
-              ("Have dinner".to_string(), true),
-              ("Shower and head to bed".to_string(), false),
+              ChecklistCellInsertChangeset::new("Have breakfast".to_string(), true),
+              ChecklistCellInsertChangeset::new("Have lunch".to_string(), true),
+              ChecklistCellInsertChangeset::new("Take a nap".to_string(), false),
+              ChecklistCellInsertChangeset::new("Have dinner".to_string(), true),
+              ChecklistCellInsertChangeset::new("Shower and head to bed".to_string(), false),
             ]),
             _ => "".to_owned(),
           };
@@ -234,7 +255,10 @@ pub fn make_test_grid() -> DatabaseData {
             },
             FieldType::Checkbox => row_builder.insert_checkbox_cell("false"),
             FieldType::Checklist => {
-              row_builder.insert_checklist_cell(vec![("Task 1".to_string(), true)])
+              row_builder.insert_checklist_cell(vec![ChecklistCellInsertChangeset::new(
+                "Task 1".to_string(),
+                true,
+              )])
             },
             _ => "".to_owned(),
           };
@@ -274,9 +298,9 @@ pub fn make_test_grid() -> DatabaseData {
             },
             FieldType::Checkbox => row_builder.insert_checkbox_cell("true"),
             FieldType::Checklist => row_builder.insert_checklist_cell(vec![
-              ("Sprint".to_string(), true),
-              ("Sprint some more".to_string(), false),
-              ("Rest".to_string(), true),
+              ChecklistCellInsertChangeset::new("Sprint".to_string(), true),
+              ChecklistCellInsertChangeset::new("Sprint some more".to_string(), false),
+              ChecklistCellInsertChangeset::new("Rest".to_string(), true),
             ]),
             _ => "".to_owned(),
           };

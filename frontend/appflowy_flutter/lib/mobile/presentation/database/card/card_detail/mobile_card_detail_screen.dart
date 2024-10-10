@@ -1,8 +1,11 @@
+import 'package:flutter/material.dart';
+
 import 'package:appflowy/generated/flowy_svgs.g.dart';
 import 'package:appflowy/generated/locale_keys.g.dart';
 import 'package:appflowy/mobile/presentation/base/app_bar/app_bar.dart';
 import 'package:appflowy/mobile/presentation/base/app_bar/app_bar_actions.dart';
 import 'package:appflowy/mobile/presentation/bottom_sheet/bottom_sheet.dart';
+import 'package:appflowy/mobile/presentation/database/card/card_detail/widgets/row_page_button.dart';
 import 'package:appflowy/mobile/presentation/widgets/flowy_mobile_quick_action_button.dart';
 import 'package:appflowy/plugins/database/application/cell/bloc/text_cell_bloc.dart';
 import 'package:appflowy/plugins/database/application/cell/cell_controller.dart';
@@ -18,11 +21,14 @@ import 'package:appflowy/plugins/database/widgets/cell/editable_cell_builder.dar
 import 'package:appflowy/plugins/database/widgets/cell/editable_cell_skeleton/text.dart';
 import 'package:appflowy/plugins/database/widgets/row/cells/cell_container.dart';
 import 'package:appflowy/plugins/database/widgets/row/row_property.dart';
+import 'package:appflowy/plugins/document/presentation/editor_plugins/file/file_upload_menu.dart';
+import 'package:appflowy/plugins/document/presentation/editor_plugins/file/file_util.dart';
+import 'package:appflowy/shared/af_image.dart';
+import 'package:appflowy_backend/protobuf/flowy-database2/file_entities.pbenum.dart';
 import 'package:appflowy_backend/protobuf/flowy-database2/row_entities.pb.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flowy_infra/theme_extension.dart';
 import 'package:flowy_infra_ui/flowy_infra_ui.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:go_router/go_router.dart';
@@ -145,6 +151,58 @@ class _MobileRowDetailPageState extends State<MobileRowDetailPage> {
           ),
           const Divider(height: 8.5, thickness: 0.5),
           MobileQuickActionButton(
+            onTap: () => showMobileBottomSheet(
+              context,
+              title: LocaleKeys.grid_media_addFileMobile.tr(),
+              showHeader: true,
+              showCloseButton: true,
+              showDragHandle: true,
+              builder: (dialogContext) => Container(
+                margin: const EdgeInsets.only(top: 12),
+                constraints: const BoxConstraints(
+                  maxHeight: 340,
+                  minHeight: 80,
+                ),
+                child: FileUploadMenu(
+                  onInsertLocalFile: (files) async {
+                    context
+                      ..pop()
+                      ..pop();
+
+                    if (_bloc.state.currentRowId == null) {
+                      return;
+                    }
+
+                    await insertLocalFiles(
+                      context,
+                      files,
+                      userProfile: _bloc.userProfile,
+                      documentId: _bloc.state.currentRowId!,
+                      onUploadSuccess: (file, path, isLocalMode) {
+                        _bloc.add(
+                          MobileRowDetailEvent.addCover(
+                            RowCoverPB(
+                              data: path,
+                              uploadType: isLocalMode
+                                  ? FileUploadTypePB.LocalFile
+                                  : FileUploadTypePB.CloudFile,
+                              coverType: CoverTypePB.FileCover,
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                  onInsertNetworkFile: (url) async =>
+                      _onInsertNetworkFile(url, context),
+                ),
+              ),
+            ),
+            icon: FlowySvgs.add_cover_s,
+            text: 'Add cover',
+          ),
+          const Divider(height: 8.5, thickness: 0.5),
+          MobileQuickActionButton(
             onTap: () => _performAction(viewId, _bloc.state.currentRowId, true),
             text: LocaleKeys.button_delete.tr(),
             textColor: Theme.of(context).colorScheme.error,
@@ -174,6 +232,38 @@ class _MobileRowDetailPageState extends State<MobileRowDetailPage> {
           ? LocaleKeys.board_cardDeleted.tr()
           : LocaleKeys.board_cardDuplicated.tr(),
       gravity: ToastGravity.BOTTOM,
+    );
+  }
+
+  Future<void> _onInsertNetworkFile(
+    String url,
+    BuildContext context,
+  ) async {
+    context
+      ..pop()
+      ..pop();
+
+    if (url.isEmpty) return;
+    final uri = Uri.tryParse(url);
+    if (uri == null) {
+      return;
+    }
+
+    String name = uri.pathSegments.isNotEmpty ? uri.pathSegments.last : "";
+    if (name.isEmpty && uri.pathSegments.length > 1) {
+      name = uri.pathSegments[uri.pathSegments.length - 2];
+    } else if (name.isEmpty) {
+      name = uri.host;
+    }
+
+    _bloc.add(
+      MobileRowDetailEvent.addCover(
+        RowCoverPB(
+          data: url,
+          uploadType: FileUploadTypePB.NetworkFile,
+          coverType: CoverTypePB.FileCover,
+        ),
+      ),
     );
   }
 }
@@ -294,6 +384,7 @@ class MobileRowDetailPageContentState
   RowCache get rowCache => widget.databaseController.rowCache;
   FieldController get fieldController =>
       widget.databaseController.fieldController;
+  ValueNotifier<String> primaryFieldId = ValueNotifier('');
 
   @override
   void initState() {
@@ -304,6 +395,8 @@ class MobileRowDetailPageContentState
       viewId: viewId,
       rowCache: rowCache,
     );
+    rowController.initialize();
+
     cellBuilder = EditableCellBuilder(
       databaseController: widget.databaseController,
     );
@@ -317,68 +410,129 @@ class MobileRowDetailPageContentState
         rowController: rowController,
       ),
       child: BlocBuilder<RowDetailBloc, RowDetailState>(
-        builder: (context, rowDetailState) {
-          return Column(
-            children: [
-              BlocProvider<RowBannerBloc>(
-                create: (context) => RowBannerBloc(
-                  viewId: viewId,
-                  fieldController: fieldController,
-                  rowMeta: rowController.rowMeta,
-                )..add(const RowBannerEvent.initial()),
-                child: BlocBuilder<RowBannerBloc, RowBannerState>(
-                  builder: (context, state) {
-                    if (state.primaryField == null) {
-                      return const SizedBox.shrink();
-                    }
-
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: cellBuilder.buildCustom(
-                        CellContext(
-                          rowId: rowController.rowId,
-                          fieldId: state.primaryField!.id,
-                        ),
-                        skinMap: EditableCellSkinMap(
-                          textSkin: _TitleSkin(),
-                        ),
+        builder: (context, rowDetailState) => Column(
+          children: [
+            if (rowDetailState.rowMeta.cover.data.isNotEmpty) ...[
+              GestureDetector(
+                onTap: () => showMobileBottomSheet(
+                  context,
+                  backgroundColor: AFThemeExtension.of(context).background,
+                  showDragHandle: true,
+                  builder: (_) => Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      MobileQuickActionButton(
+                        onTap: () {
+                          context
+                            ..pop()
+                            ..read<RowDetailBloc>()
+                                .add(const RowDetailEvent.removeCover());
+                        },
+                        text: LocaleKeys.button_delete.tr(),
+                        textColor: Theme.of(context).colorScheme.error,
+                        icon: FlowySvgs.trash_s,
+                        iconColor: Theme.of(context).colorScheme.error,
                       ),
-                    );
-                  },
+                    ],
+                  ),
                 ),
-              ),
-              Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.only(top: 9, bottom: 100),
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: MobileRowPropertyList(
-                        databaseController: widget.databaseController,
-                        cellBuilder: cellBuilder,
-                      ),
+                child: SizedBox(
+                  height: 200,
+                  width: double.infinity,
+                  child: Container(
+                    clipBehavior: Clip.antiAlias,
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surface,
                     ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(6, 6, 16, 0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (rowDetailState.numHiddenFields != 0) ...[
-                            const ToggleHiddenFieldsVisibilityButton(),
-                          ],
-                          MobileRowDetailCreateFieldButton(
-                            viewId: viewId,
-                            fieldController: fieldController,
-                          ),
-                        ],
-                      ),
+                    child: AFImage(
+                      url: rowDetailState.rowMeta.cover.data,
+                      uploadType: widget.rowMeta.cover.uploadType,
+                      userProfile:
+                          context.read<MobileRowDetailBloc>().userProfile,
                     ),
-                  ],
+                  ),
                 ),
               ),
             ],
-          );
-        },
+            BlocProvider<RowBannerBloc>(
+              create: (context) => RowBannerBloc(
+                viewId: viewId,
+                fieldController: fieldController,
+                rowMeta: rowController.rowMeta,
+              )..add(const RowBannerEvent.initial()),
+              child: BlocConsumer<RowBannerBloc, RowBannerState>(
+                listener: (context, state) {
+                  if (state.primaryField == null) {
+                    return;
+                  }
+                  primaryFieldId.value = state.primaryField!.id;
+                },
+                builder: (context, state) {
+                  if (state.primaryField == null) {
+                    return const SizedBox.shrink();
+                  }
+
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: cellBuilder.buildCustom(
+                      CellContext(
+                        rowId: rowController.rowId,
+                        fieldId: state.primaryField!.id,
+                      ),
+                      skinMap: EditableCellSkinMap(textSkin: _TitleSkin()),
+                    ),
+                  );
+                },
+              ),
+            ),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.only(top: 9, bottom: 100),
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: MobileRowPropertyList(
+                      databaseController: widget.databaseController,
+                      cellBuilder: cellBuilder,
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(6, 6, 16, 0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (rowDetailState.numHiddenFields != 0) ...[
+                          const ToggleHiddenFieldsVisibilityButton(),
+                        ],
+                        const VSpace(8.0),
+                        ValueListenableBuilder(
+                          valueListenable: primaryFieldId,
+                          builder: (context, primaryFieldId, child) {
+                            if (primaryFieldId.isEmpty) {
+                              return const SizedBox.shrink();
+                            }
+                            return OpenRowPageButton(
+                              databaseController: widget.databaseController,
+                              cellContext: CellContext(
+                                rowId: rowController.rowId,
+                                fieldId: primaryFieldId,
+                              ),
+                              documentId: rowController.rowMeta.documentId,
+                            );
+                          },
+                        ),
+                        MobileRowDetailCreateFieldButton(
+                          viewId: viewId,
+                          fieldController: fieldController,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -401,7 +555,9 @@ class _TitleSkin extends IEditableTextCellSkin {
             fontSize: 23,
             fontWeight: FontWeight.w500,
           ),
-      onChanged: (text) => bloc.add(TextCellEvent.updateText(text)),
+      onEditingComplete: () {
+        bloc.add(TextCellEvent.updateText(textEditingController.text));
+      },
       decoration: InputDecoration(
         contentPadding: const EdgeInsets.symmetric(vertical: 9),
         border: InputBorder.none,

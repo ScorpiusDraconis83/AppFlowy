@@ -57,7 +57,6 @@ pub enum FilterScript {
   },
   DeleteFilter {
     filter_id: String,
-    field_id: String,
     changed: Option<FilterRowChanged>,
   },
   // CreateSimpleAdvancedFilter,
@@ -194,7 +193,7 @@ impl DatabaseFilterTest {
       } => {
         self.subscribe_view_changed().await;
         self.assert_future_changed(changed).await;
-        let field = self.get_first_field(field_type);
+        let field = self.get_first_field(field_type).await;
         let params = FilterChangeset::Insert {
           parent_filter_id,
           data: FilterInner::Data {
@@ -269,17 +268,10 @@ impl DatabaseFilterTest {
         let filters = self.editor.get_all_filters(&self.view_id).await.items;
         assert_eq!(count, filters.len());
       },
-      FilterScript::DeleteFilter {
-        filter_id,
-        field_id,
-        changed,
-      } => {
+      FilterScript::DeleteFilter { filter_id, changed } => {
         self.subscribe_view_changed().await;
         self.assert_future_changed(changed).await;
-        let params = FilterChangeset::Delete {
-          filter_id,
-          field_id,
-        };
+        let params = FilterChangeset::Delete { filter_id };
         self
           .editor
           .modify_view_filters(&self.view_id, params)
@@ -301,8 +293,16 @@ impl DatabaseFilterTest {
         }
       },
       FilterScript::AssertNumberOfVisibleRows { expected } => {
-        let grid = self.editor.get_database_data(&self.view_id).await.unwrap();
-        assert_eq!(grid.rows.len(), expected);
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        let _ = self
+          .editor
+          .open_database_view(&self.view_id, Some(tx))
+          .await
+          .unwrap();
+        rx.await.unwrap();
+
+        let rows = self.editor.get_all_rows(&self.view_id).await.unwrap();
+        assert_eq!(rows.len(), expected);
       },
       FilterScript::Wait { millisecond } => {
         tokio::time::sleep(Duration::from_millis(millisecond)).await;

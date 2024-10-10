@@ -6,7 +6,6 @@ import 'package:appflowy/plugins/database/grid/application/grid_bloc.dart';
 import 'package:appflowy/plugins/database/grid/application/grid_header_bloc.dart';
 import 'package:appflowy/plugins/database/tab_bar/tab_bar_view.dart';
 import 'package:appflowy_backend/log.dart';
-import 'package:appflowy_editor/appflowy_editor.dart' hide Log;
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flowy_infra/size.dart';
 import 'package:flowy_infra/theme_extension.dart';
@@ -14,6 +13,7 @@ import 'package:flowy_infra_ui/flowy_infra_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:reorderables/reorderables.dart';
+import 'package:universal_platform/universal_platform.dart';
 
 import '../../layout/sizes.dart';
 import 'desktop_field_cell.dart';
@@ -112,7 +112,7 @@ class _GridHeaderState extends State<_GridHeader> {
             ),
             draggingWidgetOpacity: 0,
             header: _cellLeading(),
-            needsLongPressDraggable: PlatformExtension.isMobile,
+            needsLongPressDraggable: UniversalPlatform.isMobile,
             footer: _CellTrailing(viewId: widget.viewId),
             onReorder: (int oldIndex, int newIndex) {
               context
@@ -161,7 +161,7 @@ class _CellTrailing extends StatelessWidget {
       margin: EdgeInsets.only(right: GridSize.scrollBarSize + Insets.m),
       decoration: BoxDecoration(
         border: Border(
-          bottom: BorderSide(color: Theme.of(context).dividerColor),
+          bottom: BorderSide(color: AFThemeExtension.of(context).borderColor),
         ),
       ),
       child: CreateFieldButton(
@@ -174,7 +174,7 @@ class _CellTrailing extends StatelessWidget {
   }
 }
 
-class CreateFieldButton extends StatefulWidget {
+class CreateFieldButton extends StatelessWidget {
   const CreateFieldButton({
     super.key,
     required this.viewId,
@@ -184,11 +184,6 @@ class CreateFieldButton extends StatefulWidget {
   final String viewId;
   final void Function(String fieldId) onFieldCreated;
 
-  @override
-  State<CreateFieldButton> createState() => _CreateFieldButtonState();
-}
-
-class _CreateFieldButtonState extends State<CreateFieldButton> {
   @override
   Widget build(BuildContext context) {
     return FlowyButton(
@@ -202,16 +197,16 @@ class _CreateFieldButtonState extends State<CreateFieldButton> {
       hoverColor: AFThemeExtension.of(context).greyHover,
       onTap: () async {
         final result = await FieldBackendService.createField(
-          viewId: widget.viewId,
+          viewId: viewId,
         );
         result.fold(
-          (field) => widget.onFieldCreated(field.id),
+          (field) => onFieldCreated(field.id),
           (err) => Log.error("Failed to create field type option: $err"),
         );
       },
       leftIcon: const FlowySvg(
-        FlowySvgs.add_s,
-        size: Size.square(18),
+        FlowySvgs.add_less_padding_s,
+        size: Size.square(16),
       ),
     );
   }

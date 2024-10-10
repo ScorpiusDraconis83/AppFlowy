@@ -1,9 +1,7 @@
 import 'dart:io';
 
-import 'package:flutter/material.dart';
-
-import 'package:appflowy/generated/locale_keys.g.dart';
 import 'package:appflowy/generated/flowy_svgs.g.dart';
+import 'package:appflowy/generated/locale_keys.g.dart';
 import 'package:appflowy/mobile/presentation/bottom_sheet/show_mobile_bottom_sheet.dart';
 import 'package:appflowy/plugins/document/application/document_bloc.dart';
 import 'package:appflowy/plugins/document/application/document_service.dart';
@@ -12,23 +10,25 @@ import 'package:appflowy/plugins/document/presentation/editor_plugins/image/comm
 import 'package:appflowy/plugins/document/presentation/editor_plugins/image/image_util.dart';
 import 'package:appflowy/plugins/document/presentation/editor_plugins/image/multi_image_block_component/multi_image_block_component.dart';
 import 'package:appflowy/plugins/document/presentation/editor_plugins/image/upload_image_menu/upload_image_menu.dart';
-import 'package:appflowy/shared/patterns/common_patterns.dart';
+import 'package:appflowy/shared/patterns/file_type_patterns.dart';
 import 'package:appflowy/startup/startup.dart';
 import 'package:appflowy/workspace/application/settings/application_data_storage.dart';
 import 'package:appflowy/workspace/presentation/home/toast.dart';
 import 'package:appflowy_backend/log.dart';
-import 'package:appflowy_editor/appflowy_editor.dart' hide UploadImageMenu, Log;
+import 'package:appflowy_editor/appflowy_editor.dart' hide UploadImageMenu;
 import 'package:appflowy_popover/appflowy_popover.dart';
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flowy_infra/uuid.dart';
 import 'package:flowy_infra_ui/flowy_infra_ui.dart';
 import 'package:flowy_infra_ui/style_widget/hover.dart';
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart';
 import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
 import 'package:string_validator/string_validator.dart';
+import 'package:universal_platform/universal_platform.dart';
 
 class MultiImagePlaceholder extends StatefulWidget {
   const MultiImagePlaceholder({super.key, required this.node});
@@ -67,26 +67,29 @@ class MultiImagePlaceholderState extends State<MultiImagePlaceholder> {
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
           child: Row(
             children: [
-              FlowySvg(FlowySvgs.slash_menu_icon_photo_gallery_s,
-                  color: Theme.of(context).hintColor,
-                  size: const Size.square(24),),
+              FlowySvg(
+                FlowySvgs.slash_menu_icon_photo_gallery_s,
+                color: Theme.of(context).hintColor,
+                size: const Size.square(24),
+              ),
               const HSpace(10),
               FlowyText(
-                  PlatformExtension.isDesktop
-                      ? isDraggingFiles
-                          ? LocaleKeys.document_plugins_image_dropImageToInsert
-                              .tr()
-                          : LocaleKeys.document_plugins_image_addAnImageDesktop
-                              .tr()
-                      : LocaleKeys.document_plugins_image_addAnImageMobile.tr(),
-                  color: Theme.of(context).hintColor,),
+                UniversalPlatform.isDesktop
+                    ? isDraggingFiles
+                        ? LocaleKeys.document_plugins_image_dropImageToInsert
+                            .tr()
+                        : LocaleKeys.document_plugins_image_addAnImageDesktop
+                            .tr()
+                    : LocaleKeys.document_plugins_image_addAnImageMobile.tr(),
+                color: Theme.of(context).hintColor,
+              ),
             ],
           ),
         ),
       ),
     );
 
-    if (PlatformExtension.isDesktopOrWeb) {
+    if (UniversalPlatform.isDesktopOrWeb) {
       return AppFlowyPopover(
         controller: controller,
         direction: PopoverDirection.bottomWithCenterAligned,
@@ -104,11 +107,11 @@ class MultiImagePlaceholderState extends State<MultiImagePlaceholder> {
               UploadImageType.local,
               UploadImageType.url,
               UploadImageType.unsplash,
-              UploadImageType.stabilityAI,
             ],
-            onSelectedLocalImages: (paths) {
+            onSelectedLocalImages: (files) {
               controller.close();
               WidgetsBinding.instance.addPostFrameCallback((timeStamp) async {
+                final paths = files.map((file) => file.path).toList();
                 await insertLocalImages(paths);
               });
             },
@@ -164,7 +167,7 @@ class MultiImagePlaceholderState extends State<MultiImagePlaceholder> {
   }
 
   void showUploadImageMenu() {
-    if (PlatformExtension.isDesktopOrWeb) {
+    if (UniversalPlatform.isDesktopOrWeb) {
       controller.show();
     } else {
       final isLocalMode = _isLocalMode();
@@ -189,9 +192,10 @@ class MultiImagePlaceholderState extends State<MultiImagePlaceholder> {
                 UploadImageType.url,
                 UploadImageType.unsplash,
               ],
-              onSelectedLocalImages: (paths) async {
+              onSelectedLocalImages: (files) async {
                 context.pop();
-                await insertLocalImages(paths);
+                final items = files.map((file) => file.path).toList();
+                await insertLocalImages(items);
               },
               onSelectedAIImage: (url) async {
                 context.pop();

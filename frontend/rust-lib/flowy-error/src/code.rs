@@ -307,6 +307,16 @@ pub enum ErrorCode {
 
   #[error("Invalid Request")]
   InvalidRequest = 106,
+
+  #[error("In progress")]
+  // when client receives InProgress, it should retry
+  InProgress = 107,
+
+  #[error("Upload part size exceeds the limit")]
+  SingleUploadLimitExceeded = 108,
+
+  #[error("Group name is empty")]
+  GroupNameIsEmpty = 109,
 }
 
 impl ErrorCode {

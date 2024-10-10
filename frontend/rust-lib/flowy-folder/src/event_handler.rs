@@ -107,7 +107,7 @@ pub(crate) async fn create_view_handler(
   let set_as_current = params.set_as_current;
   let (view, _) = folder.create_view_with_params(params, true).await?;
   if set_as_current {
-    let _ = folder.set_current_view(&view.id).await;
+    let _ = folder.set_current_view(view.id.clone()).await;
   }
   data_result_ok(view_pb_without_child_views(view))
 }
@@ -121,7 +121,7 @@ pub(crate) async fn create_orphan_view_handler(
   let set_as_current = params.set_as_current;
   let view = folder.create_orphan_view_with_params(params).await?;
   if set_as_current {
-    let _ = folder.set_current_view(&view.id).await;
+    let _ = folder.set_current_view(view.id.clone()).await;
   }
   data_result_ok(view_pb_without_child_views(view))
 }
@@ -226,7 +226,7 @@ pub(crate) async fn set_latest_view_handler(
 ) -> Result<(), FlowyError> {
   let folder = upgrade_folder(folder)?;
   let view_id: ViewIdPB = data.into_inner();
-  let _ = folder.set_current_view(&view_id.value).await;
+  let _ = folder.set_current_view(view_id.value.clone()).await;
   Ok(())
 }
 
@@ -268,11 +268,12 @@ pub(crate) async fn move_nested_view_handler(
 pub(crate) async fn duplicate_view_handler(
   data: AFPluginData<DuplicateViewPayloadPB>,
   folder: AFPluginState<Weak<FolderManager>>,
-) -> Result<(), FlowyError> {
+) -> DataResult<ViewPB, FlowyError> {
   let folder = upgrade_folder(folder)?;
   let params: DuplicateViewParams = data.into_inner().try_into()?;
-  folder.duplicate_view(params).await?;
-  Ok(())
+
+  let view_pb = folder.duplicate_view(params).await?;
+  data_result_ok(view_pb)
 }
 
 #[tracing::instrument(level = "debug", skip(folder), err)]
@@ -382,6 +383,19 @@ pub(crate) async fn import_data_handler(
   data_result_ok(views)
 }
 
+#[tracing::instrument(level = "debug", skip(data, folder), err)]
+pub(crate) async fn import_zip_file_handler(
+  data: AFPluginData<ImportZipPB>,
+  folder: AFPluginState<Weak<FolderManager>>,
+) -> DataResult<RepeatedViewPB, FlowyError> {
+  let folder = upgrade_folder(folder)?;
+  let data = data.try_into_inner()?;
+  folder
+    .import_zip_file(&data.parent_view_id, &data.file_path)
+    .await?;
+  todo!()
+}
+
 #[tracing::instrument(level = "debug", skip(folder), err)]
 pub(crate) async fn get_folder_snapshots_handler(
   data: AFPluginData<WorkspaceIdPB>,
@@ -400,7 +414,9 @@ pub(crate) async fn update_view_visibility_status_handler(
 ) -> Result<(), FlowyError> {
   let folder = upgrade_folder(folder)?;
   let params = data.into_inner();
-  folder.set_views_visibility(params.view_ids, params.is_public);
+  folder
+    .set_views_visibility(params.view_ids, params.is_public)
+    .await;
   Ok(())
 }
 

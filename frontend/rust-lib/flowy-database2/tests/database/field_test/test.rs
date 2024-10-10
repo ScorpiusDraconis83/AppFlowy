@@ -1,11 +1,12 @@
 use collab_database::database::gen_option_id;
-
-use flowy_database2::entities::{FieldChangesetParams, FieldType};
-use flowy_database2::services::field::{SelectOption, SingleSelectTypeOption, CHECK, UNCHECK};
+use collab_database::fields::select_type_option::{SelectOption, SelectTypeOption};
+use flowy_database2::entities::{FieldChangesetPB, FieldType};
+use flowy_database2::services::field::{CHECK, UNCHECK};
 
 use crate::database::field_test::script::DatabaseFieldTest;
 use crate::database::field_test::script::FieldScript::*;
 use crate::database::field_test::util::*;
+use collab_database::fields::select_type_option::SingleSelectTypeOption;
 
 #[tokio::test]
 async fn grid_create_field() {
@@ -85,8 +86,8 @@ async fn grid_update_field_with_empty_change() {
   let scripts = vec![CreateField { params }];
   test.run_scripts(scripts).await;
 
-  let field = test.get_fields().pop().unwrap().clone();
-  let changeset = FieldChangesetParams {
+  let field = test.get_fields().await.pop().unwrap().clone();
+  let changeset = FieldChangesetPB {
     field_id: field.id.clone(),
     view_id: test.view_id(),
     ..Default::default()
@@ -110,7 +111,7 @@ async fn grid_delete_field() {
   let scripts = vec![CreateField { params }];
   test.run_scripts(scripts).await;
 
-  let field = test.get_fields().pop().unwrap();
+  let field = test.get_fields().await.pop().unwrap();
   let scripts = vec![
     DeleteField { field },
     AssertFieldCount(original_field_count),
@@ -121,10 +122,11 @@ async fn grid_delete_field() {
 #[tokio::test]
 async fn grid_switch_from_select_option_to_checkbox_test() {
   let mut test = DatabaseFieldTest::new().await;
-  let field = test.get_first_field(FieldType::SingleSelect);
+  let field = test.get_first_field(FieldType::SingleSelect).await;
+  let view_id = test.view_id();
 
   // Update the type option data of single select option
-  let mut options = test.get_single_select_type_option(&field.id);
+  let mut options = test.get_single_select_type_option(&field.id).await;
   options.clear();
   // Add a new option with name CHECK
   options.push(SelectOption {
@@ -142,13 +144,14 @@ async fn grid_switch_from_select_option_to_checkbox_test() {
   let scripts = vec![
     UpdateTypeOption {
       field_id: field.id.clone(),
-      type_option: SingleSelectTypeOption {
+      type_option: SingleSelectTypeOption(SelectTypeOption {
         options,
         disable_color: false,
-      }
+      })
       .into(),
     },
     SwitchToField {
+      view_id: view_id.clone(),
       field_id: field.id.clone(),
       new_field_type: FieldType::Checkbox,
     },
@@ -159,10 +162,11 @@ async fn grid_switch_from_select_option_to_checkbox_test() {
 #[tokio::test]
 async fn grid_switch_from_checkbox_to_select_option_test() {
   let mut test = DatabaseFieldTest::new().await;
-  let checkbox_field = test.get_first_field(FieldType::Checkbox).clone();
+  let checkbox_field = test.get_first_field(FieldType::Checkbox).await.clone();
   let scripts = vec![
     // switch to single-select field type
     SwitchToField {
+      view_id: test.view_id(),
       field_id: checkbox_field.id.clone(),
       new_field_type: FieldType::SingleSelect,
     },
@@ -181,7 +185,7 @@ async fn grid_switch_from_checkbox_to_select_option_test() {
   ];
   test.run_scripts(scripts).await;
 
-  let options = test.get_single_select_type_option(&checkbox_field.id);
+  let options = test.get_single_select_type_option(&checkbox_field.id).await;
   assert_eq!(options.len(), 2);
   assert!(options.iter().any(|option| option.name == UNCHECK));
   assert!(options.iter().any(|option| option.name == CHECK));
@@ -194,11 +198,12 @@ async fn grid_switch_from_checkbox_to_select_option_test() {
 #[tokio::test]
 async fn grid_switch_from_multi_select_to_text_test() {
   let mut test = DatabaseFieldTest::new().await;
-  let field_rev = test.get_first_field(FieldType::MultiSelect).clone();
+  let field_rev = test.get_first_field(FieldType::MultiSelect).await.clone();
 
-  let multi_select_type_option = test.get_multi_select_type_option(&field_rev.id);
+  let multi_select_type_option = test.get_multi_select_type_option(&field_rev.id).await;
 
   let script_switch_field = vec![SwitchToField {
+    view_id: test.view_id(),
     field_id: field_rev.id.clone(),
     new_field_type: FieldType::RichText,
   }];
@@ -225,10 +230,11 @@ async fn grid_switch_from_multi_select_to_text_test() {
 #[tokio::test]
 async fn grid_switch_from_checkbox_to_text_test() {
   let mut test = DatabaseFieldTest::new().await;
-  let field_rev = test.get_first_field(FieldType::Checkbox);
+  let field_rev = test.get_first_field(FieldType::Checkbox).await;
 
   let scripts = vec![
     SwitchToField {
+      view_id: test.view_id(),
       field_id: field_rev.id.clone(),
       new_field_type: FieldType::RichText,
     },
@@ -252,9 +258,10 @@ async fn grid_switch_from_checkbox_to_text_test() {
 #[tokio::test]
 async fn grid_switch_from_date_to_text_test() {
   let mut test = DatabaseFieldTest::new().await;
-  let field = test.get_first_field(FieldType::DateTime).clone();
+  let field = test.get_first_field(FieldType::DateTime).await.clone();
   let scripts = vec![
     SwitchToField {
+      view_id: test.view_id(),
       field_id: field.id.clone(),
       new_field_type: FieldType::RichText,
     },
@@ -278,10 +285,11 @@ async fn grid_switch_from_date_to_text_test() {
 #[tokio::test]
 async fn grid_switch_from_number_to_text_test() {
   let mut test = DatabaseFieldTest::new().await;
-  let field = test.get_first_field(FieldType::Number).clone();
+  let field = test.get_first_field(FieldType::Number).await.clone();
 
   let scripts = vec![
     SwitchToField {
+      view_id: test.view_id(),
       field_id: field.id.clone(),
       new_field_type: FieldType::RichText,
     },
@@ -304,10 +312,11 @@ async fn grid_switch_from_number_to_text_test() {
 #[tokio::test]
 async fn grid_switch_from_checklist_to_text_test() {
   let mut test = DatabaseFieldTest::new().await;
-  let field_rev = test.get_first_field(FieldType::Checklist);
+  let field_rev = test.get_first_field(FieldType::Checklist).await;
 
   let scripts = vec![
     SwitchToField {
+      view_id: test.view_id(),
       field_id: field_rev.id.clone(),
       new_field_type: FieldType::RichText,
     },

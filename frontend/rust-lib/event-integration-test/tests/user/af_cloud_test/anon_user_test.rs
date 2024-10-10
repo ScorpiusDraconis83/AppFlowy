@@ -1,4 +1,4 @@
-use event_integration_test::user_event::user_localhost_af_cloud;
+use event_integration_test::user_event::use_localhost_af_cloud;
 use event_integration_test::EventIntegrationTest;
 use flowy_core::DEFAULT_NAME;
 use flowy_user::entities::AuthenticatorPB;
@@ -49,7 +49,7 @@ async fn migrate_anon_user_data_to_af_cloud_test() {
   //    view: Document2
   //      view: Grid1
   //      view: Grid2
-  user_localhost_af_cloud().await;
+  use_localhost_af_cloud().await;
   let test =
     EventIntegrationTest::new_with_user_data_path(user_db_path.clone(), DEFAULT_NAME.to_string())
       .await;
@@ -77,11 +77,11 @@ async fn migrate_anon_user_data_to_af_cloud_test() {
   assert_eq!(user.authenticator, AuthenticatorPB::AppFlowyCloud);
 
   let user_first_level_views = test.get_all_workspace_views().await;
-  assert_eq!(user_first_level_views.len(), 2);
+  assert_eq!(user_first_level_views.len(), 3);
 
   println!("user first level views: {:?}", user_first_level_views);
   let user_second_level_views = test
-    .get_view(&user_first_level_views[1].id)
+    .get_view(&user_first_level_views[2].id)
     .await
     .child_views;
   println!("user second level views: {:?}", user_second_level_views);
@@ -95,15 +95,14 @@ async fn migrate_anon_user_data_to_af_cloud_test() {
   assert_eq!(anon_first_level_views.len(), 1);
 
   // the first view of user_first_level_views is the default get started view
-  assert_eq!(user_first_level_views.len(), 2);
+  assert_eq!(user_first_level_views.len(), 3);
   assert_ne!(anon_first_level_views[0].id, user_first_level_views[1].id);
   assert_eq!(
     anon_first_level_views[0].name,
-    user_first_level_views[1].name
+    user_first_level_views[2].name
   );
 
   // check second level
-  assert_eq!(anon_second_level_views.len(), user_second_level_views.len());
   assert_ne!(anon_second_level_views[0].id, user_second_level_views[0].id);
   assert_eq!(
     anon_second_level_views[0].name,

@@ -1,5 +1,9 @@
 import 'dart:io';
 
+import 'package:appflowy/util/field_type_extension.dart';
+import 'package:flutter/material.dart' hide Card;
+import 'package:flutter/services.dart';
+
 import 'package:appflowy/generated/flowy_svgs.g.dart';
 import 'package:appflowy/generated/locale_keys.g.dart';
 import 'package:appflowy/mobile/presentation/database/board/mobile_board_page.dart';
@@ -8,29 +12,27 @@ import 'package:appflowy/plugins/database/application/row/row_controller.dart';
 import 'package:appflowy/plugins/database/board/application/board_actions_bloc.dart';
 import 'package:appflowy/plugins/database/board/presentation/widgets/board_column_header.dart';
 import 'package:appflowy/plugins/database/grid/presentation/grid_page.dart';
-import 'package:appflowy/plugins/database/grid/presentation/widgets/header/field_type_extension.dart';
 import 'package:appflowy/plugins/database/tab_bar/desktop/setting_menu.dart';
 import 'package:appflowy/plugins/database/tab_bar/tab_bar_view.dart';
 import 'package:appflowy/plugins/database/widgets/card/card_bloc.dart';
 import 'package:appflowy/plugins/database/widgets/cell/card_cell_style_maps/desktop_board_card_cell_style.dart';
 import 'package:appflowy/plugins/database/widgets/row/row_detail.dart';
 import 'package:appflowy/shared/conditional_listenable_builder.dart';
+import 'package:appflowy/shared/flowy_error_page.dart';
 import 'package:appflowy_backend/protobuf/flowy-database2/protobuf.dart';
 import 'package:appflowy_backend/protobuf/flowy-folder/view.pb.dart';
 import 'package:appflowy_board/appflowy_board.dart';
-import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flowy_infra/theme_extension.dart';
 import 'package:flowy_infra_ui/flowy_infra_ui.dart';
 import 'package:flowy_infra_ui/style_widget/hover.dart';
-import 'package:flowy_infra_ui/widget/error_page.dart';
-import 'package:flutter/material.dart' hide Card;
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:universal_platform/universal_platform.dart';
 
 import '../../widgets/card/card.dart';
 import '../../widgets/cell/card_cell_builder.dart';
 import '../application/board_bloc.dart';
+
 import 'toolbar/board_setting_bar.dart';
 import 'widgets/board_focus_scope.dart';
 import 'widgets/board_hidden_groups.dart';
@@ -47,7 +49,7 @@ class BoardPageTabBarBuilderImpl extends DatabaseTabBarItemBuilder {
     bool shrinkWrap,
     String? initialRowId,
   ) =>
-      PlatformExtension.isDesktop
+      UniversalPlatform.isDesktop
           ? DesktopBoardPage(
               key: _makeValueKey(controller),
               view: view,
@@ -199,9 +201,10 @@ class _DesktopBoardPageState extends State<DesktopBoardPage> {
           loading: (_) => const Center(
             child: CircularProgressIndicator.adaptive(),
           ),
-          error: (err) => FlowyErrorPage.message(
-            err.toString(),
-            howToFix: LocaleKeys.errorDialog_howToFixFallback.tr(),
+          error: (err) => Center(
+            child: AppFlowyErrorPage(
+              error: err.error,
+            ),
           ),
           orElse: () => _BoardContent(
             onEditStateChanged: widget.onEditStateChanged,
@@ -339,9 +342,10 @@ class _BoardContentState extends State<_BoardContent> {
                       false
                   ? BoardTrailing(scrollController: scrollController)
                   : const HSpace(40),
-              headerBuilder: (_, groupData) => BlocProvider<BoardBloc>.value(
+              headerBuilder: (_, groupData) => BlocProvider.value(
                 value: context.read<BoardBloc>(),
                 child: BoardColumnHeader(
+                  databaseController: databaseController,
                   groupData: groupData,
                   margin: config.groupHeaderPadding,
                 ),
@@ -517,7 +521,7 @@ class _BoardColumnFooterState extends State<BoardColumnFooter> {
               FlowySvgs.add_s,
               color: Theme.of(context).hintColor,
             ),
-            text: FlowyText.medium(
+            text: FlowyText(
               LocaleKeys.board_column_createNewCard.tr(),
               color: Theme.of(context).hintColor,
             ),
@@ -556,10 +560,8 @@ class _BoardCardState extends State<_BoardCard> {
   @override
   Widget build(BuildContext context) {
     final boardBloc = context.read<BoardBloc>();
-
     final groupData = widget.afGroupData.customData as GroupData;
     final rowCache = boardBloc.rowCache;
-
     final databaseController = boardBloc.databaseController;
     final rowMeta =
         rowCache.getRow(widget.groupItem.id)?.rowMeta ?? widget.groupItem.row;
@@ -653,7 +655,7 @@ class _BoardCardState extends State<_BoardCard> {
             onTap: (context) => _openCard(
               context: context,
               databaseController: databaseController,
-              rowMeta: context.read<CardBloc>().state.rowMeta,
+              rowMeta: context.read<CardBloc>().rowController.rowMeta,
             ),
             onShiftTap: (_) {
               Focus.of(context).requestFocus();
@@ -687,6 +689,7 @@ class _BoardCardState extends State<_BoardCard> {
                     rowId: rowMeta.id,
                   ),
                 ),
+            userProfile: context.read<BoardBloc>().userProfile,
           ),
         ),
       ),
@@ -852,6 +855,7 @@ void _openCard({
     builder: (_) => RowDetailPage(
       databaseController: databaseController,
       rowController: rowController,
+      userProfile: context.read<BoardBloc>().userProfile,
     ),
   );
 }

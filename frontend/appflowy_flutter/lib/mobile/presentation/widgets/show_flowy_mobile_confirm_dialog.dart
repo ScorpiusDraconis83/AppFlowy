@@ -91,6 +91,7 @@ Future<T?> showFlowyMobileConfirmDialog<T>(
 Future<T?> showFlowyCupertinoConfirmDialog<T>({
   BuildContext? context,
   required String title,
+  Widget? content,
   required Widget leftButton,
   required Widget rightButton,
   void Function(BuildContext context)? onLeftButtonPressed,
@@ -98,13 +99,15 @@ Future<T?> showFlowyCupertinoConfirmDialog<T>({
 }) {
   return showDialog(
     context: context ?? AppGlobals.context,
+    barrierColor: Colors.black.withOpacity(0.25),
     builder: (context) => CupertinoAlertDialog(
       title: FlowyText.medium(
         title,
-        fontSize: 18,
+        fontSize: 16,
         maxLines: 10,
-        lineHeight: 1.3,
+        figmaLineHeight: 22.0,
       ),
+      content: content,
       actions: [
         CupertinoDialogAction(
           onPressed: () {

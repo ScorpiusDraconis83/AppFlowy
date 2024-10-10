@@ -289,6 +289,14 @@ class UserWorkspaceBloc extends Bloc<UserWorkspaceEvent, UserWorkspaceState> {
             );
           },
           updateWorkspaceIcon: (workspaceId, icon) async {
+            final workspace = state.workspaces.firstWhere(
+              (e) => e.workspaceId == workspaceId,
+            );
+            if (icon == workspace.icon) {
+              Log.info('ignore same icon update');
+              return;
+            }
+
             final result = await _userService.updateWorkspaceIcon(
               workspaceId,
               icon,
@@ -493,6 +501,11 @@ class UserWorkspaceActionResult {
   final UserWorkspaceActionType actionType;
   final bool isLoading;
   final FlowyResult<void, FlowyError>? result;
+
+  @override
+  String toString() {
+    return 'UserWorkspaceActionResult(actionType: $actionType, isLoading: $isLoading, result: $result)';
+  }
 }
 
 @freezed

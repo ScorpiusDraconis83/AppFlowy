@@ -15,7 +15,6 @@ flowy-database-pub = { workspace = true }
 
 flowy-derive.workspace = true
 flowy-notification = { workspace = true }
-parking_lot.workspace = true
 protobuf.workspace = true
 flowy-error = { path = "../flowy-error", features = [
     "impl_from_dispatch_error",
@@ -29,6 +28,7 @@ tracing.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 serde_repr.workspace = true
+arc-swap.workspace = true
 lib-infra = { workspace = true }
 chrono = { workspace = true, default-features = false, features = ["clock"] }
 rust_decimal = "1.28.1"
@@ -45,13 +45,16 @@ rayon = "1.9.0"
 nanoid = "0.4.0"
 async-trait.workspace = true
 chrono-tz = "0.8.2"
-csv = "1.1.6"
+csv = "1.3.0"
 strum = "0.25"
 strum_macros = "0.25"
 validator = { workspace = true, features = ["derive"] }
+tokio-util.workspace = true
+moka = { version = "0.12.8", features = ["future"] }
 
 [dev-dependencies]
 event-integration-test = { path = "../event-integration-test", default-features = false }
+flowy-database2 = { path = ".", features = ["verbose_log"] }
 
 [build-dependencies]
 flowy-codegen.workspace = true
@@ -60,3 +63,4 @@ flowy-codegen.workspace = true
 [features]
 dart = ["flowy-codegen/dart", "flowy-notification/dart"]
 ts = ["flowy-codegen/ts", "flowy-notification/tauri_ts"]
+verbose_log = ["collab-database/verbose_log"]

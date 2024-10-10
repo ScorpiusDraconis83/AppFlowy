@@ -11,12 +11,18 @@ import 'package:appflowy/shared/feature_flags.dart';
 import 'package:appflowy/startup/startup.dart';
 import 'package:appflowy/user/presentation/screens/screens.dart';
 import 'package:appflowy/user/presentation/screens/sign_in_screen/widgets/widgets.dart';
+import 'package:appflowy/workspace/application/view/view_ext.dart';
+import 'package:appflowy/workspace/presentation/home/menu/sidebar/footer/sidebar_footer.dart';
 import 'package:appflowy/workspace/presentation/home/menu/sidebar/shared/sidebar_new_page_button.dart';
+import 'package:appflowy/workspace/presentation/home/menu/sidebar/space/shared_widget.dart';
+import 'package:appflowy/workspace/presentation/home/menu/sidebar/space/sidebar_space_header.dart';
+import 'package:appflowy/workspace/presentation/home/menu/sidebar/space/sidebar_space_menu.dart';
 import 'package:appflowy/workspace/presentation/home/menu/sidebar/workspace/_sidebar_workspace_menu.dart';
 import 'package:appflowy/workspace/presentation/home/menu/sidebar/workspace/sidebar_workspace.dart';
 import 'package:appflowy/workspace/presentation/home/menu/view/draggable_view_item.dart';
 import 'package:appflowy/workspace/presentation/home/menu/view/view_action_type.dart';
 import 'package:appflowy/workspace/presentation/home/menu/view/view_add_button.dart';
+import 'package:appflowy/workspace/presentation/home/menu/view/view_item.dart';
 import 'package:appflowy/workspace/presentation/home/menu/view/view_more_action_button.dart';
 import 'package:appflowy/workspace/presentation/notifications/widgets/flowy_tab.dart';
 import 'package:appflowy/workspace/presentation/notifications/widgets/notification_button.dart';
@@ -52,6 +58,14 @@ extension CommonOperations on WidgetTester {
       await tapButton(anonymousButton);
     }
 
+    if (Platform.isWindows) {
+      await pumpAndSettle(const Duration(milliseconds: 200));
+    }
+  }
+
+  Future<void> tapContinousAnotherWay() async {
+    // local version
+    await tapButtonWithName(LocaleKeys.signIn_continueAnotherWay.tr());
     if (Platform.isWindows) {
       await pumpAndSettle(const Duration(milliseconds: 200));
     }
@@ -226,6 +240,10 @@ extension CommonOperations on WidgetTester {
     await tapOKButton();
   }
 
+  Future<void> tapTrashButton() async {
+    await tap(find.byType(SidebarTrashButton));
+  }
+
   Future<void> tapOKButton() async {
     final okButton = find.byWidgetPredicate(
       (widget) =>
@@ -233,6 +251,20 @@ extension CommonOperations on WidgetTester {
           widget.label == LocaleKeys.button_ok.tr(),
     );
     await tapButton(okButton);
+  }
+
+  /// Expand or collapse the page.
+  Future<void> expandOrCollapsePage({
+    required String pageName,
+    required ViewLayoutPB layout,
+  }) async {
+    final page = findPageName(pageName, layout: layout);
+    await hoverOnWidget(page);
+    final expandButton = find.descendant(
+      of: page,
+      matching: find.byType(ViewItemDefaultLeftIcon),
+    );
+    await tapButton(expandButton.first);
   }
 
   /// Tap the restore button.
@@ -247,12 +279,14 @@ extension CommonOperations on WidgetTester {
 
   /// Tap the delete permanently button.
   ///
-  /// the restore button will show after the current page is deleted.
+  /// the delete permanently button will show after the current page is deleted.
   Future<void> tapDeletePermanentlyButton() async {
-    final restoreButton = find.textContaining(
+    final deleteButton = find.textContaining(
       LocaleKeys.deletePagePrompt_deletePermanent.tr(),
     );
-    await tapButton(restoreButton);
+    await tapButton(deleteButton);
+    await tap(find.text(LocaleKeys.button_delete.tr()));
+    await pumpAndSettle();
   }
 
   /// Tap the share button above the document page.
@@ -295,7 +329,7 @@ extension CommonOperations on WidgetTester {
     // hover on it and change it's name
     if (name != null) {
       await hoverOnPageName(
-        LocaleKeys.menuAppHeader_defaultNewPageName.tr(),
+        layout.defaultName,
         layout: layout,
         onHover: () async {
           await renamePage(name);
@@ -309,13 +343,87 @@ extension CommonOperations on WidgetTester {
     if (openAfterCreated) {
       await openPage(
         // if the name is null, use the default name
-        name ?? LocaleKeys.menuAppHeader_defaultNewPageName.tr(),
+        name ?? layout.defaultName,
         layout: layout,
       );
       await pumpAndSettle();
     }
   }
 
+  /// Create a new page in the space
+  Future<void> createNewPageInSpace({
+    required String spaceName,
+    required ViewLayoutPB layout,
+    bool openAfterCreated = true,
+    String? pageName,
+  }) async {
+    final currentSpace = find.byWidgetPredicate(
+      (widget) => widget is CurrentSpace && widget.space.name == spaceName,
+    );
+    if (currentSpace.evaluate().isEmpty) {
+      throw Exception('Current space not found');
+    }
+
+    await hoverOnWidget(
+      currentSpace,
+      onHover: () async {
+        // click the + button
+        await clickAddPageButtonInSpaceHeader();
+        await tapButtonWithName(layout.menuName);
+      },
+    );
+    await pumpAndSettle();
+
+    if (pageName != null) {
+      // move the cursor to other place to disable to tooltips
+      await tapAt(Offset.zero);
+
+      // hover on new created page and change it's name
+      await hoverOnPageName(
+        '',
+        layout: layout,
+        onHover: () async {
+          await renamePage(pageName);
+          await pumpAndSettle();
+        },
+      );
+      await pumpAndSettle();
+    }
+
+    // open the page after created
+    if (openAfterCreated) {
+      await openPage(
+        // if the name is null, use the default name
+        pageName ?? LocaleKeys.menuAppHeader_defaultNewPageName.tr(),
+        layout: layout,
+      );
+      await pumpAndSettle();
+    }
+  }
+
+  /// Click the + button in the space header
+  Future<void> clickAddPageButtonInSpaceHeader() async {
+    final addPageButton = find.descendant(
+      of: find.byType(SidebarSpaceHeader),
+      matching: find.byType(ViewAddButton),
+    );
+    await tapButton(addPageButton);
+  }
+
+  /// Click the + button in the space header
+  Future<void> clickSpaceHeader() async {
+    await tapButton(find.byType(SidebarSpaceHeader));
+  }
+
+  Future<void> openSpace(String spaceName) async {
+    final space = find.descendant(
+      of: find.byType(SidebarSpaceMenuItem),
+      matching: find.text(spaceName),
+    );
+    await tapButton(space);
+  }
+
+  /// Create a new page on the top level
   Future<void> createNewPage({
     ViewLayoutPB layout = ViewLayoutPB.Document,
     bool openAfterCreated = true,
@@ -329,6 +437,7 @@ extension CommonOperations on WidgetTester {
     bool isShiftPressed = false,
     bool isAltPressed = false,
     bool isMetaPressed = false,
+    PhysicalKeyboardKey? physicalKey,
   }) async {
     if (isControlPressed) {
       await simulateKeyDownEvent(LogicalKeyboardKey.control);
@@ -342,8 +451,14 @@ extension CommonOperations on WidgetTester {
     if (isMetaPressed) {
       await simulateKeyDownEvent(LogicalKeyboardKey.meta);
     }
-    await simulateKeyDownEvent(key);
-    await simulateKeyUpEvent(key);
+    await simulateKeyDownEvent(
+      key,
+      physicalKey: physicalKey,
+    );
+    await simulateKeyUpEvent(
+      key,
+      physicalKey: physicalKey,
+    );
     if (isControlPressed) {
       await simulateKeyUpEvent(LogicalKeyboardKey.control);
     }
@@ -539,7 +654,11 @@ extension CommonOperations on WidgetTester {
     expect(createWorkspaceDialog, findsOneWidget);
 
     // input the workspace name
-    await enterText(find.byType(TextField), name);
+    final workspaceNameInput = find.descendant(
+      of: createWorkspaceDialog,
+      matching: find.byType(TextField),
+    );
+    await enterText(workspaceNameInput, name);
 
     await tapButtonWithName(LocaleKeys.button_ok.tr(), pumpAndSettle: false);
     await pump(const Duration(seconds: 5));
@@ -571,8 +690,7 @@ extension CommonOperations on WidgetTester {
 
   Future<void> openMoreViewActions() async {
     final button = find.byType(MoreViewActions);
-    await tap(button);
-    await pumpAndSettle();
+    await tapButton(button);
   }
 
   /// Presses on the Duplicate ViewAction in the [MoreViewActions] popup.
@@ -580,12 +698,9 @@ extension CommonOperations on WidgetTester {
   /// [openMoreViewActions] must be called beforehand!
   ///
   Future<void> duplicateByMoreViewActions() async {
-    final button = find.descendant(
-      of: find.byType(ListView),
-      matching: find.byWidgetPredicate(
-        (widget) =>
-            widget is ViewAction && widget.type == ViewActionType.duplicate,
-      ),
+    final button = find.byWidgetPredicate(
+      (widget) =>
+          widget is ViewAction && widget.type == ViewMoreActionType.duplicate,
     );
     await tap(button);
     await pump();
@@ -600,7 +715,7 @@ extension CommonOperations on WidgetTester {
       of: find.byType(ListView),
       matching: find.byWidgetPredicate(
         (widget) =>
-            widget is ViewAction && widget.type == ViewActionType.delete,
+            widget is ViewAction && widget.type == ViewMoreActionType.delete,
       ),
     );
     await tap(button);

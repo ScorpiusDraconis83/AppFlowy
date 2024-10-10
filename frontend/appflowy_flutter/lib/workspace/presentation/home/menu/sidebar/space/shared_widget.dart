@@ -21,6 +21,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:universal_platform/universal_platform.dart';
 
 class SpacePermissionSwitch extends StatefulWidget {
   const SpacePermissionSwitch({
@@ -185,19 +186,9 @@ class SpaceCancelOrConfirmButton extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
-        DecoratedBox(
-          decoration: ShapeDecoration(
-            shape: RoundedRectangleBorder(
-              side: const BorderSide(color: Color(0x1E14171B)),
-              borderRadius: BorderRadius.circular(8),
-            ),
-          ),
-          child: FlowyButton(
-            useIntrinsicWidth: true,
-            margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 9.0),
-            text: FlowyText.regular(LocaleKeys.button_cancel.tr()),
-            onTap: onCancel,
-          ),
+        OutlinedRoundedButton(
+          text: LocaleKeys.button_cancel.tr(),
+          onTap: onCancel,
         ),
         const HSpace(12.0),
         DecoratedBox(
@@ -213,7 +204,8 @@ class SpaceCancelOrConfirmButton extends StatelessWidget {
             radius: BorderRadius.circular(8),
             text: FlowyText.regular(
               confirmButtonName,
-              color: Colors.white,
+              lineHeight: 1.0,
+              color: Theme.of(context).colorScheme.onPrimary,
             ),
             onTap: onConfirm,
           ),
@@ -240,23 +232,11 @@ class SpaceOkButton extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
-        DecoratedBox(
-          decoration: ShapeDecoration(
-            color: confirmButtonColor ?? Theme.of(context).colorScheme.primary,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-          ),
-          child: FlowyButton(
-            useIntrinsicWidth: true,
-            margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 9.0),
-            radius: BorderRadius.circular(8),
-            text: FlowyText.regular(
-              confirmButtonName,
-              color: Colors.white,
-            ),
-            onTap: onConfirm,
-          ),
+        PrimaryRoundedButton(
+          text: confirmButtonName,
+          margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 9.0),
+          radius: 8.0,
+          onTap: onConfirm,
         ),
       ],
     );
@@ -342,18 +322,20 @@ class _ConfirmPopupState extends State<ConfirmPopup> {
           Navigator.of(context).pop();
         }
       },
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          vertical: 20.0,
-          horizontal: 20.0,
-        ),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        color: UniversalPlatform.isDesktop
+            ? null
+            : Theme.of(context).colorScheme.surface,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildTitle(),
-            const VSpace(6),
-            _buildDescription(),
+            if (widget.description.isNotEmpty) ...[
+              const VSpace(6),
+              _buildDescription(),
+            ],
             if (widget.child != null) ...[
               const VSpace(12),
               widget.child!,
@@ -394,6 +376,10 @@ class _ConfirmPopupState extends State<ConfirmPopup> {
   }
 
   Widget _buildDescription() {
+    if (widget.description.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
     return FlowyText.regular(
       widget.description,
       fontSize: 16.0,
@@ -486,10 +472,12 @@ class CurrentSpace extends StatelessWidget {
     super.key,
     this.onTapBlankArea,
     required this.space,
+    this.isHovered = false,
   });
 
   final ViewPB space;
   final VoidCallback? onTapBlankArea;
+  final bool isHovered;
 
   @override
   Widget build(BuildContext context) {
@@ -509,6 +497,7 @@ class CurrentSpace extends StatelessWidget {
             fontSize: 14.0,
             figmaLineHeight: 18.0,
             overflow: TextOverflow.ellipsis,
+            color: isHovered ? Theme.of(context).colorScheme.onSurface : null,
           ),
         ),
         const HSpace(4.0),
@@ -516,6 +505,7 @@ class CurrentSpace extends StatelessWidget {
           context.read<SpaceBloc>().state.isExpanded
               ? FlowySvgs.workspace_drop_down_menu_show_s
               : FlowySvgs.workspace_drop_down_menu_hide_s,
+          color: isHovered ? Theme.of(context).colorScheme.onSurface : null,
         ),
       ],
     );
@@ -568,7 +558,7 @@ class SpacePages extends StatelessWidget {
   final ViewItemRightIconsBuilder? rightIconsBuilder;
   final ViewItemOnSelected onSelected;
   final ViewItemOnSelected? onTertiarySelected;
-  final bool Function(ViewPB view)? shouldIgnoreView;
+  final IgnoreViewType Function(ViewPB view)? shouldIgnoreView;
 
   @override
   Widget build(BuildContext context) {
@@ -581,7 +571,10 @@ class SpacePages extends StatelessWidget {
           var childViews = state.view.childViews;
           if (shouldIgnoreView != null) {
             childViews = childViews
-                .where((childView) => !shouldIgnoreView!(childView))
+                .where(
+                  (childView) =>
+                      shouldIgnoreView!(childView) != IgnoreViewType.hide,
+                )
                 .toList();
           }
           return Column(

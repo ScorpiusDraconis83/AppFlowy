@@ -1,6 +1,3 @@
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-
 import 'package:appflowy/generated/flowy_svgs.g.dart';
 import 'package:appflowy/generated/locale_keys.g.dart';
 import 'package:appflowy/plugins/document/presentation/editor_plugins/align_toolbar_item/custom_text_align_command.dart';
@@ -23,7 +20,10 @@ import 'package:flowy_infra/theme_extension.dart';
 import 'package:flowy_infra_ui/flowy_infra_ui.dart';
 import 'package:flowy_infra_ui/style_widget/hover.dart';
 import 'package:flowy_infra_ui/widget/error_page.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:universal_platform/universal_platform.dart';
 
 class SettingsShortcutsView extends StatefulWidget {
   const SettingsShortcutsView({super.key});
@@ -608,7 +608,7 @@ extension CommandLabel on CommandShortcutEvent {
       label =
           LocaleKeys.settings_shortcutsPage_keybindings_deleteLeftSentence.tr();
     } else if (key == deleteCommand.key) {
-      label = PlatformExtension.isMacOS
+      label = UniversalPlatform.isMacOS
           ? LocaleKeys.settings_shortcutsPage_keybindings_deleteMacOS.tr()
           : LocaleKeys.settings_shortcutsPage_keybindings_delete.tr();
     } else if (key == deleteRightWordCommand.key) {

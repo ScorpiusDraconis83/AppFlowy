@@ -7,19 +7,24 @@ use collab_database::rows::RowId;
 use futures::stream::StreamExt;
 use tokio::sync::broadcast::Receiver;
 
+use crate::database::database_editor::DatabaseEditorTest;
 use flowy_database2::entities::{
-  CreateRowPayloadPB, DeleteSortPayloadPB, ReorderSortPayloadPB, UpdateSortPayloadPB,
+  CreateRowPayloadPB, DeleteSortPayloadPB, FieldType, ReorderSortPayloadPB, UpdateSortPayloadPB,
 };
 use flowy_database2::services::cell::stringify_cell;
 use flowy_database2::services::database_view::DatabaseViewChanged;
+use flowy_database2::services::filter::{FilterChangeset, FilterInner};
 use flowy_database2::services::sort::SortCondition;
-
-use crate::database::database_editor::DatabaseEditorTest;
+use lib_infra::box_any::BoxAny;
 
 pub enum SortScript {
   InsertSort {
     field: Field,
     condition: SortCondition,
+  },
+  InsertFilter {
+    field_type: FieldType,
+    data: BoxAny,
   },
   ReorderSort {
     from_sort_id: String,
@@ -83,6 +88,22 @@ impl DatabaseSortTest {
         };
         let _ = self.editor.create_or_update_sort(params).await.unwrap();
       },
+      SortScript::InsertFilter { field_type, data } => {
+        let field = self.get_first_field(field_type).await;
+        let params = FilterChangeset::Insert {
+          parent_filter_id: None,
+          data: FilterInner::Data {
+            field_id: field.id,
+            field_type,
+            condition_and_content: data,
+          },
+        };
+        self
+          .editor
+          .modify_view_filters(&self.view_id, params)
+          .await
+          .unwrap();
+      },
       SortScript::ReorderSort {
         from_sort_id,
         to_sort_id,
@@ -117,10 +138,10 @@ impl DatabaseSortTest {
       },
       SortScript::AssertCellContentOrder { field_id, orders } => {
         let mut cells = vec![];
-        let rows = self.editor.get_rows(&self.view_id).await.unwrap();
-        let field = self.editor.get_field(&field_id).unwrap();
-        for row_detail in rows {
-          if let Some(cell) = row_detail.row.cells.get(&field_id) {
+        let rows = self.editor.get_all_rows(&self.view_id).await.unwrap();
+        let field = self.editor.get_field(&field_id).await.unwrap();
+        for row in rows {
+          if let Some(cell) = row.cells.get(&field_id) {
             let content = stringify_cell(cell, &field);
             cells.push(content);
           } else {
@@ -211,7 +232,6 @@ async fn assert_sort_changed(
           old_row_orders.insert(changed.new_index, old);
           assert_eq!(old_row_orders, new_row_orders);
         },
-        DatabaseViewChanged::InsertRowNotification(_changed) => {},
         _ => {},
       }
     })

@@ -1,3 +1,4 @@
+import { AFConfigContext } from '@/components/main/app.hooks';
 import React, { useCallback, useContext, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { NormalModal } from '@/components/_shared/modal';
@@ -5,25 +6,24 @@ import SelectWorkspace from '@/components/publish/header/duplicate/SelectWorkspa
 import { useLoadWorkspaces } from '@/components/publish/header/duplicate/useDuplicate';
 import SpaceList from '@/components/publish/header/duplicate/SpaceList';
 import { downloadPage, openAppFlowySchema } from '@/utils/url';
-import { AFConfigContext } from '@/components/app/AppConfig';
 import { PublishContext } from '@/application/publish';
-import { CollabType, ViewLayout } from '@/application/collab.type';
+import { Types, ViewLayout } from '@/application/types';
 import { notify } from '@/components/_shared/notify';
 
-function getCollabTypeFromViewLayout(layout: ViewLayout) {
+function getCollabTypeFromViewLayout (layout: ViewLayout) {
   switch (layout) {
     case ViewLayout.Document:
-      return CollabType.Document;
+      return Types.Document;
     case ViewLayout.Grid:
     case ViewLayout.Board:
     case ViewLayout.Calendar:
-      return CollabType.Database;
+      return Types.Database;
     default:
       return null;
   }
 }
 
-function DuplicateModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+function DuplicateModal ({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { t } = useTranslation();
   const service = useContext(AFConfigContext)?.service;
   const viewMeta = useContext(PublishContext)?.viewMeta;
@@ -40,14 +40,21 @@ function DuplicateModal({ open, onClose }: { open: boolean; onClose: () => void 
     selectedSpaceId,
     workspaceLoading,
     spaceLoading,
+    loadWorkspaces,
+    loadSpaces,
   } = useLoadWorkspaces();
 
   useEffect(() => {
-    if (!open) {
-      setSelectedWorkspaceId(workspaceList[0]?.id || '');
-      setSelectedSpaceId('');
+    if (open) {
+      void loadWorkspaces();
     }
-  }, [open, setSelectedSpaceId, setSelectedWorkspaceId, workspaceList]);
+  }, [loadWorkspaces, open]);
+
+  useEffect(() => {
+    if (selectedWorkspaceId) {
+      void loadSpaces(selectedWorkspaceId);
+    }
+  }, [loadSpaces, selectedWorkspaceId]);
 
   const handleDuplicate = useCallback(async () => {
     if (!viewId) return;
@@ -108,7 +115,7 @@ function DuplicateModal({ open, onClose }: { open: boolean; onClose: () => void 
             maxWidth: 420,
           },
         }}
-        okText={t('publish.openApp')}
+        okText={t('publish.useThisTemplate')}
         cancelText={t('publish.downloadIt')}
         onOk={() => window.open(openAppFlowySchema, '_self')}
         onCancel={() => {

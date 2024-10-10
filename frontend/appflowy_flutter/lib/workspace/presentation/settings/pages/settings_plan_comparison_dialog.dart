@@ -626,6 +626,7 @@ class _Heading extends StatelessWidget {
                   description!,
                   fontSize: 12,
                   maxLines: 5,
+                  lineHeight: 1.5,
                 ),
               ),
             ],
@@ -667,6 +668,9 @@ final _planLabels = [
     label: LocaleKeys.settings_comparePlanDialog_planLabels_itemSix.tr(),
     tooltip: LocaleKeys.settings_comparePlanDialog_planLabels_tooltipSix.tr(),
   ),
+  _PlanItem(
+    label: LocaleKeys.settings_comparePlanDialog_planLabels_itemFileUpload.tr(),
+  ),
 ];
 
 class _CellItem {
@@ -702,6 +706,9 @@ final List<_CellItem> _freeLabels = [
   _CellItem(
     label: LocaleKeys.settings_comparePlanDialog_freeLabels_itemSix.tr(),
   ),
+  _CellItem(
+    label: LocaleKeys.settings_comparePlanDialog_freeLabels_itemFileUpload.tr(),
+  ),
 ];
 
 final List<_CellItem> _proLabels = [
@@ -729,5 +736,8 @@ final List<_CellItem> _proLabels = [
   ),
   _CellItem(
     label: LocaleKeys.settings_comparePlanDialog_proLabels_itemSix.tr(),
+  ),
+  _CellItem(
+    label: LocaleKeys.settings_comparePlanDialog_proLabels_itemFileUpload.tr(),
   ),
 ];

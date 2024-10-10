@@ -5,6 +5,7 @@ import 'package:appflowy/env/cloud_env.dart';
 import 'package:appflowy/startup/tasks/feature_flag_task.dart';
 import 'package:appflowy/workspace/application/settings/prelude.dart';
 import 'package:appflowy_backend/appflowy_backend.dart';
+import 'package:appflowy_backend/log.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
@@ -14,6 +15,7 @@ import 'deps_resolver.dart';
 import 'entry_point.dart';
 import 'launch_configuration.dart';
 import 'plugin/plugin.dart';
+import 'tasks/file_storage_task.dart';
 import 'tasks/prelude.dart';
 
 final getIt = GetIt.instance;
@@ -29,6 +31,8 @@ class FlowyRunnerContext {
 }
 
 Future<void> runAppFlowy({bool isAnon = false}) async {
+  Log.info('restart AppFlowy: isAnon: $isAnon');
+
   if (kReleaseMode) {
     await FlowyRunner.run(
       AppFlowyApplication(),
@@ -109,7 +113,9 @@ class FlowyRunner {
       [
         // this task should be first task, for handling platform errors.
         // don't catch errors in test mode
-        if (!mode.isUnitTest) const PlatformErrorCatcherTask(),
+        if (!mode.isUnitTest && !mode.isIntegrationTest)
+          const PlatformErrorCatcherTask(),
+        if (!mode.isUnitTest) const InitSentryTask(),
         // this task should be second task, for handling memory leak.
         // there's a flag named _enable in memory_leak_detector.dart. If it's false, the task will be ignored.
         MemoryLeakDetectorTask(),
@@ -124,6 +130,7 @@ class FlowyRunner {
         InitRustSDKTask(customApplicationPath: applicationDataDirectory),
         // Load Plugins, like document, grid ...
         const PluginLoadTask(),
+        const FileStorageTask(),
 
         // init the app widget
         // ignore in test mode
@@ -132,7 +139,6 @@ class FlowyRunner {
           // It is unable to get the device information from the test environment.
           const ApplicationInfoTask(),
           const HotKeyTask(),
-          if (isSupabaseEnabled) InitSupabaseTask(),
           if (isAppFlowyCloudEnabled) InitAppFlowyCloudTask(),
           const InitAppWidgetTask(),
           const InitPlatformServiceTask(),

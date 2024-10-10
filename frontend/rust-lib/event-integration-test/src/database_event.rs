@@ -3,14 +3,15 @@ use std::convert::TryFrom;
 
 use bytes::Bytes;
 use collab_database::database::timestamp;
+use collab_database::fields::select_type_option::{
+  MultiSelectTypeOption, SelectOption, SingleSelectTypeOption,
+};
 use collab_database::fields::Field;
 use collab_database::rows::{Row, RowId};
 use flowy_database2::entities::*;
 use flowy_database2::event_map::DatabaseEvent;
 use flowy_database2::services::cell::CellBuilder;
-use flowy_database2::services::field::{
-  MultiSelectTypeOption, SelectOption, SingleSelectTypeOption,
-};
+use flowy_database2::services::field::ChecklistCellInsertChangeset;
 use flowy_database2::services::share::csv::CSVFormat;
 use flowy_folder::entities::*;
 use flowy_folder::event_map::FolderEvent;
@@ -24,7 +25,7 @@ impl EventIntegrationTest {
     self
       .appflowy_core
       .database_manager
-      .get_database_with_view_id(database_view_id)
+      .get_database_editor_with_view_id(database_view_id)
       .await
       .unwrap()
       .export_csv(CSVFormat::Original)
@@ -185,6 +186,7 @@ impl EventIntegrationTest {
         view_id: view_id.to_string(),
         field_id: field_id.to_string(),
         field_type,
+        field_name: None,
       })
       .async_send()
       .await
@@ -263,7 +265,7 @@ impl EventIntegrationTest {
   pub async fn get_row(&self, view_id: &str, row_id: &str) -> OptionalRowPB {
     EventBuilder::new(self.clone())
       .event(DatabaseEvent::GetRow)
-      .payload(RowIdPB {
+      .payload(DatabaseViewRowIdPB {
         view_id: view_id.to_string(),
         row_id: row_id.to_string(),
         group_id: None,
@@ -276,7 +278,7 @@ impl EventIntegrationTest {
   pub async fn get_row_meta(&self, view_id: &str, row_id: &str) -> RowMetaPB {
     EventBuilder::new(self.clone())
       .event(DatabaseEvent::GetRowMeta)
-      .payload(RowIdPB {
+      .payload(DatabaseViewRowIdPB {
         view_id: view_id.to_string(),
         row_id: row_id.to_string(),
         group_id: None,
@@ -298,7 +300,7 @@ impl EventIntegrationTest {
   pub async fn duplicate_row(&self, view_id: &str, row_id: &str) -> Option<FlowyError> {
     EventBuilder::new(self.clone())
       .event(DatabaseEvent::DuplicateRow)
-      .payload(RowIdPB {
+      .payload(DatabaseViewRowIdPB {
         view_id: view_id.to_string(),
         row_id: row_id.to_string(),
         group_id: None,
@@ -472,7 +474,6 @@ impl EventIntegrationTest {
     &self,
     view_id: &str,
     group_id: &str,
-    field_id: &str,
     name: Option<String>,
     visible: Option<bool>,
   ) -> Option<FlowyError> {
@@ -481,7 +482,6 @@ impl EventIntegrationTest {
       .payload(UpdateGroupPB {
         view_id: view_id.to_string(),
         group_id: group_id.to_string(),
-        field_id: field_id.to_string(),
         name,
         visible,
       })
@@ -626,7 +626,8 @@ impl<'a> TestRowBuilder<'a> {
     let single_select_field = self.field_with_type(&FieldType::SingleSelect);
     let type_option = single_select_field
       .get_type_option::<SingleSelectTypeOption>(FieldType::SingleSelect)
-      .unwrap();
+      .unwrap()
+      .0;
     let option = f(type_option.options);
     self
       .cell_build
@@ -642,7 +643,8 @@ impl<'a> TestRowBuilder<'a> {
     let multi_select_field = self.field_with_type(&FieldType::MultiSelect);
     let type_option = multi_select_field
       .get_type_option::<MultiSelectTypeOption>(FieldType::MultiSelect)
-      .unwrap();
+      .unwrap()
+      .0;
     let options = f(type_option.options);
     let ops_ids = options
       .iter()
@@ -655,11 +657,11 @@ impl<'a> TestRowBuilder<'a> {
     multi_select_field.id.clone()
   }
 
-  pub fn insert_checklist_cell(&mut self, options: Vec<(String, bool)>) -> String {
+  pub fn insert_checklist_cell(&mut self, new_tasks: Vec<ChecklistCellInsertChangeset>) -> String {
     let checklist_field = self.field_with_type(&FieldType::Checklist);
     self
       .cell_build
-      .insert_checklist_cell(&checklist_field.id, options);
+      .insert_checklist_cell(&checklist_field.id, new_tasks);
     checklist_field.id.clone()
   }
 
@@ -667,6 +669,12 @@ impl<'a> TestRowBuilder<'a> {
     let time_field = self.field_with_type(&FieldType::Time);
     self.cell_build.insert_number_cell(&time_field.id, time);
     time_field.id.clone()
+  }
+
+  pub fn insert_media_cell(&mut self, media: String) -> String {
+    let media_field = self.field_with_type(&FieldType::Media);
+    self.cell_build.insert_text_cell(&media_field.id, media);
+    media_field.id.clone()
   }
 
   pub fn field_with_type(&self, field_type: &FieldType) -> Field {

@@ -15,6 +15,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flowy_infra_ui/flowy_infra_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:universal_platform/universal_platform.dart';
 
 import 'ai_limit_dialog.dart';
 
@@ -137,8 +138,15 @@ class _AutoCompletionBlockComponentState
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    if (UniversalPlatform.isMobile) {
+      return const SizedBox.shrink();
+    }
+
+    final child = Card(
       elevation: 5,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+      ),
       color: Theme.of(context).colorScheme.surface,
       child: Container(
         margin: const EdgeInsets.all(10),
@@ -164,6 +172,11 @@ class _AutoCompletionBlockComponentState
           ],
         ),
       ),
+    );
+
+    return Padding(
+      padding: const EdgeInsets.only(left: 40),
+      child: child,
     );
   }
 
@@ -470,16 +483,23 @@ class AutoCompletionInputFooter extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        FlowyTextButton.primary(
+        PrimaryRoundedButton(
           text: LocaleKeys.button_generate.tr(),
-          context: context,
-          onPressed: onGenerate,
+          margin: const EdgeInsets.symmetric(
+            horizontal: 16.0,
+            vertical: 10.0,
+          ),
+          radius: 8.0,
+          onTap: onGenerate,
         ),
         const Space(10, 0),
-        FlowyTextButton.secondary(
+        OutlinedRoundedButton(
           text: LocaleKeys.button_cancel.tr(),
-          context: context,
-          onPressed: onExit,
+          margin: const EdgeInsets.symmetric(
+            horizontal: 16.0,
+            vertical: 10.0,
+          ),
+          onTap: onExit,
         ),
         Flexible(
           child: Container(
@@ -513,22 +533,23 @@ class AutoCompletionFooter extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        FlowyTextButton.primary(
-          context: context,
+        PrimaryRoundedButton(
           text: LocaleKeys.button_keep.tr(),
-          onPressed: onKeep,
+          margin: const EdgeInsets.symmetric(
+            horizontal: 16.0,
+            vertical: 9.0,
+          ),
+          onTap: onKeep,
         ),
-        const Space(10, 0),
-        FlowyTextButton.secondary(
-          context: context,
+        const HSpace(10),
+        OutlinedRoundedButton(
           text: LocaleKeys.document_plugins_autoGeneratorRewrite.tr(),
-          onPressed: onRewrite,
+          onTap: onRewrite,
         ),
-        const Space(10, 0),
-        FlowyTextButton.secondary(
-          context: context,
+        const HSpace(10),
+        OutlinedRoundedButton(
           text: LocaleKeys.button_discard.tr(),
-          onPressed: onDiscard,
+          onTap: onDiscard,
         ),
       ],
     );

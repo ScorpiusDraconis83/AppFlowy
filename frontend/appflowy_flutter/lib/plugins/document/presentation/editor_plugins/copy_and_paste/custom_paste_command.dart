@@ -1,15 +1,17 @@
+import 'package:flutter/material.dart';
+
 import 'package:appflowy/plugins/document/application/document_bloc.dart';
+import 'package:appflowy/plugins/document/presentation/editor_notification.dart';
 import 'package:appflowy/plugins/document/presentation/editor_plugins/copy_and_paste/clipboard_service.dart';
-import 'package:appflowy/plugins/document/presentation/editor_plugins/copy_and_paste/editor_state_paste_node_extension.dart';
 import 'package:appflowy/plugins/document/presentation/editor_plugins/copy_and_paste/paste_from_html.dart';
 import 'package:appflowy/plugins/document/presentation/editor_plugins/copy_and_paste/paste_from_image.dart';
 import 'package:appflowy/plugins/document/presentation/editor_plugins/copy_and_paste/paste_from_in_app_json.dart';
 import 'package:appflowy/plugins/document/presentation/editor_plugins/copy_and_paste/paste_from_plain_text.dart';
 import 'package:appflowy/startup/startup.dart';
+import 'package:appflowy/util/default_extensions.dart';
 import 'package:appflowy_backend/log.dart';
-import 'package:appflowy_editor/appflowy_editor.dart' hide Log, EditorCopyPaste;
+import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:appflowy_editor_plugins/appflowy_editor_plugins.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:string_validator/string_validator.dart';
 
@@ -34,12 +36,20 @@ CommandShortcutEventHandler _pasteCommandHandler = (editorState) {
 
   // because the event handler is not async, so we need to use wrap the async function here
   () async {
+    EditorNotification.paste().post();
+
     // dispatch the paste event
     final data = await getIt<ClipboardService>().getData();
     final inAppJson = data.inAppJson;
     final html = data.html;
     final plainText = data.plainText;
     final image = data.image;
+
+    // dump the length of the data here, don't log the data itself for privacy concerns
+    Log.info('paste command: inAppJson: ${inAppJson?.length}');
+    Log.info('paste command: html: ${html?.length}');
+    Log.info('paste command: plainText: ${plainText?.length}');
+    Log.info('paste command: image: ${image?.$2?.length}');
 
     // paste as link preview
     if (await _pasteAsLinkPreview(editorState, plainText)) {
@@ -55,7 +65,6 @@ CommandShortcutEventHandler _pasteCommandHandler = (editorState) {
 
     // try to paste the content in order, if any of them is failed, then try the next one
     if (inAppJson != null && inAppJson.isNotEmpty) {
-      await editorState.deleteSelectionIfNeeded();
       if (await editorState.pasteInAppJson(inAppJson)) {
         Log.info('Pasted in app json');
         return;
@@ -77,6 +86,7 @@ CommandShortcutEventHandler _pasteCommandHandler = (editorState) {
         image.$1,
         image.$2!,
         documentId,
+        selection: selection,
       );
       if (result) {
         Log.info('Pasted image');
@@ -95,7 +105,10 @@ CommandShortcutEventHandler _pasteCommandHandler = (editorState) {
     if (plainText != null && plainText.isNotEmpty) {
       Log.info('Pasted plain text');
       await editorState.pastePlainText(plainText);
+      return;
     }
+
+    Log.info('unable to parse the clipboard content');
   }();
 
   return KeyEventResult.handled;
@@ -105,11 +118,17 @@ Future<bool> _pasteAsLinkPreview(
   EditorState editorState,
   String? text,
 ) async {
-  if (text == null || !isURL(text)) {
+  // 1. the url should contains a protocol
+  // 2. the url should not be an image url
+  if (text == null ||
+      text.isImageUrl() ||
+      !isURL(text, {'require_protocol': true})) {
     return false;
   }
 
   final selection = editorState.selection;
+  // Apply the update only when the selection is collapsed
+  //  and at the start of the current line
   if (selection == null ||
       !selection.isCollapsed ||
       selection.startIndex != 0) {
@@ -117,18 +136,45 @@ Future<bool> _pasteAsLinkPreview(
   }
 
   final node = editorState.getNodeAtPath(selection.start.path);
+  // Apply the update only when the current node is a paragraph
+  //  and the paragraph is empty
   if (node == null ||
       node.type != ParagraphBlockKeys.type ||
       node.delta?.toPlainText().isNotEmpty == true) {
     return false;
   }
 
-  final transaction = editorState.transaction;
-  transaction.insertNode(
-    selection.start.path,
-    linkPreviewNode(url: text),
+  // 1. insert the text with link format
+  // 2. convert it the link preview node
+  final textTransaction = editorState.transaction;
+  textTransaction.insertText(
+    node,
+    0,
+    text,
+    attributes: {AppFlowyRichTextKeys.href: text},
   );
-  await editorState.apply(transaction);
+  await editorState.apply(
+    textTransaction,
+    skipHistoryDebounce: true,
+  );
+
+  final linkPreviewTransaction = editorState.transaction;
+  final insertedNodes = [
+    linkPreviewNode(url: text),
+    // if the next node is null, insert a empty paragraph node
+    if (node.next == null) paragraphNode(),
+  ];
+  linkPreviewTransaction.insertNodes(
+    selection.start.path,
+    insertedNodes,
+  );
+  linkPreviewTransaction.deleteNode(node);
+  linkPreviewTransaction.afterSelection = Selection.collapsed(
+    Position(
+      path: node.path.next,
+    ),
+  );
+  await editorState.apply(linkPreviewTransaction);
 
   return true;
 }

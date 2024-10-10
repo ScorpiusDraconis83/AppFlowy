@@ -1,27 +1,25 @@
-import { YDoc } from '@/application/collab.type';
+import { YDoc } from '@/application/types';
 import { PublishProvider } from '@/application/publish';
+import { useOutlineDrawer } from '@/components/_shared/outline/outline.hooks';
 import ComponentLoading from '@/components/_shared/progress/ComponentLoading';
 import { AFScroller } from '@/components/_shared/scroller';
-import { AFConfigContext } from '@/components/app/AppConfig';
+import { AFConfigContext } from '@/components/main/app.hooks';
 import { GlobalCommentProvider } from '@/components/global-comment';
 import CollabView from '@/components/publish/CollabView';
-import { OutlineDrawer } from '@/components/publish/outline';
-import { createHotkey, HOT_KEY_NAME } from '@/utils/hotkeys';
+import SideBar from '@/components/publish/SideBar';
 import React, { Suspense, useCallback, useContext, useEffect, useState } from 'react';
 import { PublishViewHeader } from '@/components/publish/header';
 import NotFound from '@/components/error/NotFound';
+import { useSearchParams } from 'react-router-dom';
 
 export interface PublishViewProps {
   namespace: string;
   publishName: string;
 }
 
-const drawerWidth = 268;
-
-export function PublishView({ namespace, publishName }: PublishViewProps) {
+export function PublishView ({ namespace, publishName }: PublishViewProps) {
   const [doc, setDoc] = useState<YDoc | undefined>();
   const [notFound, setNotFound] = useState<boolean>(false);
-
   const service = useContext(AFConfigContext)?.service;
   const openPublishView = useCallback(async () => {
     let doc;
@@ -42,57 +40,77 @@ export function PublishView({ namespace, publishName }: PublishViewProps) {
     void openPublishView();
   }, [openPublishView]);
 
-  const [open, setOpen] = useState(false);
+  const [search] = useSearchParams();
 
-  const onKeyDown = useCallback((e: KeyboardEvent) => {
-    switch (true) {
-      case createHotkey(HOT_KEY_NAME.TOGGLE_SIDEBAR)(e):
-        e.preventDefault();
-        // setOpen((prev) => !prev);
-        break;
-      default:
-        break;
-    }
-  }, []);
+  const isTemplate = search.get('template') === 'true';
+  const isTemplateThumb = isTemplate && search.get('thumbnail') === 'true';
 
   useEffect(() => {
-    window.addEventListener('keydown', onKeyDown);
-    return () => {
-      window.removeEventListener('keydown', onKeyDown);
-    };
-  }, [onKeyDown]);
+    if (!isTemplateThumb) return;
+    document.documentElement.setAttribute('thumbnail', 'true');
+  }, [isTemplateThumb]);
+
+  const {
+    drawerOpened,
+    drawerWidth,
+    setDrawerWidth,
+    toggleOpenDrawer,
+  } = useOutlineDrawer();
 
   if (notFound && !doc) {
     return <NotFound />;
   }
 
   return (
-    <PublishProvider namespace={namespace} publishName={publishName}>
-      <div className={'h-screen w-screen'}>
+    <PublishProvider
+      isTemplateThumb={isTemplateThumb} isTemplate={isTemplate} namespace={namespace}
+      publishName={publishName}
+    >
+      <div
+        className={'h-screen w-screen'} style={isTemplateThumb ? {
+        pointerEvents: 'none',
+        transform: 'scale(0.333)',
+        transformOrigin: '0 0',
+        width: '300vw',
+        height: '400vh',
+        overflow: 'hidden',
+      } : undefined}
+      >
         <AFScroller
           overflowXHidden
+          overflowYHidden={isTemplateThumb}
           style={{
-            transform: open ? `translateX(${drawerWidth}px)` : 'none',
-            width: open ? `calc(100% - ${drawerWidth}px)` : '100%',
+            transform: drawerOpened ? `translateX(${drawerWidth}px)` : 'none',
+            width: drawerOpened ? `calc(100% - ${drawerWidth}px)` : '100%',
             transition: 'width 0.2s ease-in-out, transform 0.2s ease-in-out',
           }}
-          className={'appflowy-layout appflowy-scroll-container'}
+          className={'appflowy-layout appflowy-scroll-container h-full'}
         >
-          <PublishViewHeader
+          {!isTemplate && <PublishViewHeader
             onOpenDrawer={() => {
-              setOpen(true);
+              toggleOpenDrawer(true);
             }}
-            openDrawer={open}
-          />
+            drawerWidth={drawerWidth}
+            onCloseDrawer={() => {
+              toggleOpenDrawer(false);
+            }}
+            openDrawer={drawerOpened}
+          />}
 
           <CollabView doc={doc} />
-          {doc && (
+          {doc && !isTemplate && (
             <Suspense fallback={<ComponentLoading />}>
               <GlobalCommentProvider />
             </Suspense>
           )}
+
         </AFScroller>
-        {open && <OutlineDrawer width={drawerWidth} open={open} onClose={() => setOpen(false)} />}
+        {drawerOpened &&
+          <SideBar
+            onResizeDrawerWidth={setDrawerWidth} drawerWidth={drawerWidth} drawerOpened={drawerOpened}
+            toggleOpenDrawer={toggleOpenDrawer}
+          />
+        }
       </div>
     </PublishProvider>
   );

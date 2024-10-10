@@ -1,12 +1,12 @@
 import 'dart:io';
 
+import 'package:flutter/material.dart';
+
 import 'package:flowy_infra/size.dart';
 import 'package:flowy_infra_ui/style_widget/hover.dart';
-import 'package:flowy_infra_ui/style_widget/text.dart';
 import 'package:flowy_infra_ui/widget/flowy_tooltip.dart';
 import 'package:flowy_infra_ui/widget/ignore_parent_gesture.dart';
 import 'package:flowy_infra_ui/widget/spacing.dart';
-import 'package:flutter/material.dart';
 
 class FlowyIconTextButton extends StatelessWidget {
   final Widget Function(bool onHover) textBuilder;
@@ -142,7 +142,7 @@ class FlowyButton extends StatelessWidget {
   final VoidCallback? onTap;
   final VoidCallback? onSecondaryTap;
   final void Function(bool)? onHover;
-  final EdgeInsets? margin;
+  final EdgeInsetsGeometry? margin;
   final Widget? leftIcon;
   final Widget? rightIcon;
   final Color? hoverColor;
@@ -160,6 +160,7 @@ class FlowyButton extends StatelessWidget {
   final bool expand;
   final Color? borderColor;
   final Color? backgroundColor;
+  final bool resetHoverOnRebuild;
 
   const FlowyButton({
     super.key,
@@ -185,6 +186,7 @@ class FlowyButton extends StatelessWidget {
     this.expand = false,
     this.borderColor,
     this.backgroundColor,
+    this.resetHoverOnRebuild = true,
   });
 
   @override
@@ -207,6 +209,7 @@ class FlowyButton extends StatelessWidget {
       onTap: disable ? null : onTap,
       onSecondaryTap: disable ? null : onSecondaryTap,
       child: FlowyHover(
+        resetHoverOnRebuild: resetHoverOnRebuild,
         cursor:
             disable ? SystemMouseCursors.forbidden : SystemMouseCursors.click,
         style: HoverStyle(
@@ -258,16 +261,32 @@ class FlowyButton extends StatelessWidget {
       child = IntrinsicWidth(child: child);
     }
 
-    final decoration = this.decoration ??
+    var decoration = this.decoration;
+
+    if (decoration == null &&
         (showDefaultBoxDecorationOnMobile &&
-                (Platform.isIOS || Platform.isAndroid)
-            ? BoxDecoration(
-                border: Border.all(
-                color: borderColor ??
-                    Theme.of(context).colorScheme.surfaceContainerHighest,
-                width: 1.0,
-              ))
-            : null);
+            (Platform.isIOS || Platform.isAndroid))) {
+      decoration = BoxDecoration(
+        color: backgroundColor ?? Theme.of(context).colorScheme.surface,
+      );
+    }
+
+    if (decoration == null && (Platform.isIOS || Platform.isAndroid)) {
+      if (showDefaultBoxDecorationOnMobile) {
+        decoration = BoxDecoration(
+          border: Border.all(
+            color: borderColor ?? Theme.of(context).colorScheme.outline,
+            width: 1.0,
+          ),
+          borderRadius: radius,
+        );
+      } else if (backgroundColor != null) {
+        decoration = BoxDecoration(
+          color: backgroundColor,
+          borderRadius: radius,
+        );
+      }
+    }
 
     return Container(
       decoration: decoration,
@@ -296,7 +315,6 @@ class FlowyTextButton extends StatelessWidget {
     this.padding = const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
     this.hoverColor,
     this.fillColor,
-    this.textColor,
     this.heading,
     this.radius,
     this.mainAxisAlignment = MainAxisAlignment.start,
@@ -306,6 +324,7 @@ class FlowyTextButton extends StatelessWidget {
     this.fontFamily,
     this.isDangerous = false,
     this.borderColor,
+    this.lineHeight,
   });
 
   factory FlowyTextButton.primary({
@@ -351,7 +370,6 @@ class FlowyTextButton extends StatelessWidget {
   final Widget? heading;
   final Color? hoverColor;
   final Color? fillColor;
-  final Color? textColor;
   final BorderRadius? radius;
   final MainAxisAlignment mainAxisAlignment;
   final String? tooltip;
@@ -362,6 +380,7 @@ class FlowyTextButton extends StatelessWidget {
   final String? fontFamily;
   final bool isDangerous;
   final Color? borderColor;
+  final double? lineHeight;
 
   @override
   Widget build(BuildContext context) {
@@ -370,10 +389,9 @@ class FlowyTextButton extends StatelessWidget {
       children.add(heading!);
       children.add(const HSpace(8));
     }
-    children.add(FlowyText(
+    children.add(Text(
       text,
       overflow: overflow,
-      color: textColor,
       textAlign: TextAlign.center,
     ));
 
@@ -409,9 +427,10 @@ class FlowyTextButton extends StatelessWidget {
             TextStyle(
               fontWeight: fontWeight ?? FontWeight.w500,
               fontSize: fontSize,
+              color: fontColor ?? Theme.of(context).colorScheme.onPrimary,
               decoration: decoration,
               fontFamily: fontFamily,
-              height: 1.1,
+              height: lineHeight ?? 1.1,
             ),
           ),
           backgroundColor: WidgetStateProperty.resolveWith(

@@ -1,15 +1,7 @@
-import 'dart:io';
-
-import 'package:appflowy/generated/flowy_svgs.g.dart';
-import 'package:appflowy/generated/locale_keys.g.dart';
-import 'package:appflowy/shared/window_title_bar.dart';
-import 'package:appflowy/workspace/application/home/home_setting_bloc.dart';
-import 'package:easy_localization/easy_localization.dart';
-import 'package:flowy_infra_ui/style_widget/hover.dart';
-import 'package:flowy_infra_ui/widget/flowy_tooltip.dart';
+import 'package:appflowy/startup/tasks/device_info_task.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:universal_platform/universal_platform.dart';
 
 class CocoaWindowChannel {
   CocoaWindowChannel._();
@@ -38,11 +30,9 @@ class MoveWindowDetector extends StatefulWidget {
   const MoveWindowDetector({
     super.key,
     this.child,
-    this.showTitleBar = false,
   });
 
   final Widget? child;
-  final bool showTitleBar;
 
   @override
   MoveWindowDetectorState createState() => MoveWindowDetectorState();
@@ -54,26 +44,15 @@ class MoveWindowDetectorState extends State<MoveWindowDetector> {
 
   @override
   Widget build(BuildContext context) {
-    if (!Platform.isMacOS && !Platform.isWindows) {
+    // the frameless window is only supported on macOS
+    if (!UniversalPlatform.isMacOS) {
       return widget.child ?? const SizedBox.shrink();
     }
 
-    if (Platform.isWindows) {
-      return Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (widget.showTitleBar) ...[
-            WindowTitleBar(
-              leftChildren: [
-                _buildToggleMenuButton(context),
-              ],
-            ),
-          ] else ...[
-            const SizedBox(height: 5),
-          ],
-          widget.child ?? const SizedBox.shrink(),
-        ],
-      );
+    // For the macOS version 15 or higher, we can control the window position by using system APIs
+    if (ApplicationInfo.macOSMajorVersion != null &&
+        ApplicationInfo.macOSMajorVersion! >= 15) {
+      return widget.child ?? const SizedBox.shrink();
     }
 
     return GestureDetector(
@@ -94,47 +73,6 @@ class MoveWindowDetectorState extends State<MoveWindowDetector> {
             .setWindowPosition(Offset(dx + deltaX, dy - deltaY));
       },
       child: widget.child,
-    );
-  }
-
-  Widget _buildToggleMenuButton(BuildContext context) {
-    if (!context.read<HomeSettingBloc>().state.isMenuCollapsed) {
-      return const SizedBox.shrink();
-    }
-
-    final textSpan = TextSpan(
-      children: [
-        TextSpan(
-          text: '${LocaleKeys.sideBar_openSidebar.tr()}\n',
-          style: context.tooltipTextStyle(),
-        ),
-        TextSpan(
-          text: Platform.isMacOS ? '⌘+.' : 'Ctrl+\\',
-          style: context
-              .tooltipTextStyle()
-              ?.copyWith(color: Theme.of(context).hintColor),
-        ),
-      ],
-    );
-
-    return FlowyTooltip(
-      richMessage: textSpan,
-      child: Listener(
-        behavior: HitTestBehavior.translucent,
-        onPointerDown: (_) => context
-            .read<HomeSettingBloc>()
-            .add(const HomeSettingEvent.collapseMenu()),
-        child: FlowyHover(
-          child: Container(
-            width: 24,
-            padding: const EdgeInsets.all(4),
-            child: const RotatedBox(
-              quarterTurns: 2,
-              child: FlowySvg(FlowySvgs.hide_menu_s),
-            ),
-          ),
-        ),
-      ),
     );
   }
 }

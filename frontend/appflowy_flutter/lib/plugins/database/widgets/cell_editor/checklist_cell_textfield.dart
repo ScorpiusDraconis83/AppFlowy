@@ -40,35 +40,36 @@ class ChecklistCellTextfield extends StatelessWidget {
     super.key,
     required this.textController,
     required this.focusNode,
-    required this.autofocus,
-    required this.onChanged,
+    this.onChanged,
+    this.contentPadding = const EdgeInsets.symmetric(
+      vertical: 10,
+      horizontal: 2,
+    ),
     this.onSubmitted,
   });
 
   final TextEditingController textController;
   final FocusNode focusNode;
-  final bool autofocus;
+  final EdgeInsetsGeometry contentPadding;
   final VoidCallback? onSubmitted;
-  final VoidCallback onChanged;
+  final VoidCallback? onChanged;
 
   @override
   Widget build(BuildContext context) {
-    const contentPadding = EdgeInsets.symmetric(
-      vertical: 6.0,
-      horizontal: 2.0,
-    );
     return TextField(
       controller: textController,
       focusNode: focusNode,
       style: Theme.of(context).textTheme.bodyMedium,
+      maxLines: null,
       decoration: InputDecoration(
         border: InputBorder.none,
         isCollapsed: true,
+        isDense: true,
         contentPadding: contentPadding,
         hintText: LocaleKeys.grid_checklist_taskHint.tr(),
       ),
       textInputAction: onSubmitted == null ? TextInputAction.next : null,
-      onChanged: (_) => onChanged(),
+      onChanged: (_) => onChanged?.call(),
       onSubmitted: (_) => onSubmitted?.call(),
     );
   }

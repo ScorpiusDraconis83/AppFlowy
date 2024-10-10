@@ -1,9 +1,9 @@
-import React, { useCallback } from 'react';
 import { SpaceView } from '@/application/types';
+import React, { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ReactComponent as CheckIcon } from '@/assets/selected.svg';
 import { renderColor } from '@/utils/color';
-import SpaceIcon from '@/components/publish/header/SpaceIcon';
+import SpaceIcon from '@/components/_shared/breadcrumb/SpaceIcon';
 import { Button, CircularProgress, Tooltip } from '@mui/material';
 import { ReactComponent as LockSvg } from '@/assets/lock.svg';
 
@@ -14,17 +14,17 @@ export interface SpaceListProps {
   loading?: boolean;
 }
 
-function SpaceList({ loading, spaceList, value, onChange }: SpaceListProps) {
+function SpaceList ({ loading, spaceList, value, onChange }: SpaceListProps) {
   const { t } = useTranslation();
 
   const getExtraObj = useCallback((extra: string) => {
     try {
       return extra
         ? (JSON.parse(extra) as {
-            is_space?: boolean;
-            space_icon?: string;
-            space_icon_color?: string;
-          })
+          is_space?: boolean;
+          space_icon?: string;
+          space_icon_color?: string;
+        })
         : {};
     } catch (e) {
       return {};
@@ -40,11 +40,13 @@ function SpaceList({ loading, spaceList, value, onChange }: SpaceListProps) {
           <span
             className={'icon h-5 w-5'}
             style={{
-              backgroundColor: extraObj.space_icon_color ? renderColor(extraObj.space_icon_color) : undefined,
+              backgroundColor: extraObj.space_icon_color ? renderColor(extraObj.space_icon_color) : 'rgb(163, 74, 253)',
               borderRadius: '8px',
             }}
           >
-            <SpaceIcon value={extraObj.space_icon || ''} />
+            <SpaceIcon value={extraObj.space_icon || ''}
+                       char={extraObj.space_icon ? undefined : space.name.slice(0, 1)}
+            />
           </span>
           <div className={'flex flex-1 items-center gap-2 truncate'}>
             {space.name}
@@ -53,7 +55,7 @@ function SpaceList({ loading, spaceList, value, onChange }: SpaceListProps) {
         </div>
       );
     },
-    [getExtraObj]
+    [getExtraObj],
   );
 
   return (

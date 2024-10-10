@@ -10,19 +10,20 @@ import 'package:appflowy/startup/startup.dart';
 import 'package:appflowy/workspace/application/view/view_ext.dart';
 import 'package:extended_text_field/extended_text_field.dart';
 import 'package:flowy_infra/file_picker/file_picker_service.dart';
-import 'package:flowy_infra/platform_extension.dart';
 import 'package:flowy_infra/theme_extension.dart';
+import 'package:flowy_infra_ui/flowy_infra_ui.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_chat_types/flutter_chat_types.dart' as types;
 import 'package:flutter_chat_ui/flutter_chat_ui.dart';
+import 'package:universal_platform/universal_platform.dart';
 
 import 'chat_at_button.dart';
 import 'chat_input_attachment.dart';
-import 'chat_send_button.dart';
 import 'chat_input_span.dart';
+import 'chat_send_button.dart';
 import 'layout_define.dart';
 
 class ChatInput extends StatefulWidget {
@@ -67,7 +68,7 @@ class _ChatInputState extends State<ChatInput> {
     _textController = InputTextFieldController();
     _inputFocusNode = FocusNode(
       onKeyEvent: (node, event) {
-        if (PlatformExtension.isDesktop) {
+        if (UniversalPlatform.isDesktop) {
           if (_inputActionControl.canHandleKeyEvent(event)) {
             _inputActionControl.handleKeyEvent(event);
             return KeyEventResult.handled;
@@ -114,7 +115,7 @@ class _ChatInputState extends State<ChatInput> {
       child: Container(
         decoration: BoxDecoration(
           border: Border.all(
-            color: _inputFocusNode.hasFocus && !isMobile
+            color: _inputFocusNode.hasFocus
                 ? Theme.of(context).colorScheme.primary.withOpacity(0.6)
                 : Theme.of(context).colorScheme.secondary,
           ),
@@ -153,7 +154,7 @@ class _ChatInputState extends State<ChatInput> {
                 Row(
                   children: [
                     // TODO(lucas): support mobile
-                    if (PlatformExtension.isDesktop &&
+                    if (UniversalPlatform.isDesktop &&
                         widget.aiType.isLocalAI())
                       _attachmentButton(buttonPadding),
 
@@ -161,9 +162,9 @@ class _ChatInputState extends State<ChatInput> {
                     Expanded(child: _inputTextField(context, textPadding)),
 
                     // mention button
-                    // TODO(lucas): support mobile
-                    if (PlatformExtension.isDesktop)
-                      _mentionButton(buttonPadding),
+                    _mentionButton(buttonPadding),
+
+                    if (UniversalPlatform.isMobile) const HSpace(6.0),
 
                     // send button
                     _sendButton(buttonPadding),
@@ -245,6 +246,7 @@ class _ChatInputState extends State<ChatInput> {
   InputDecoration _buildInputDecoration(BuildContext context) {
     return InputDecoration(
       border: InputBorder.none,
+      enabledBorder: InputBorder.none,
       hintText: widget.hintText,
       focusedBorder: InputBorder.none,
       hintStyle: TextStyle(
@@ -272,7 +274,7 @@ class _ChatInputState extends State<ChatInput> {
       return;
     }
 
-    if (PlatformExtension.isDesktop) {
+    if (UniversalPlatform.isDesktop) {
       ChatActionsMenu(
         anchor: ChatInputAnchor(
           anchorKey: _textFieldKey,

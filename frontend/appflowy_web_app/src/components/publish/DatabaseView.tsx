@@ -1,5 +1,19 @@
-import { GetViewRowsMap, LoadView, LoadViewMeta, YDoc } from '@/application/collab.type';
+import { usePublishContext } from '@/application/publish';
+import {
+  AppendBreadcrumb,
+  CreateRowDoc,
+  LoadView,
+  LoadViewMeta,
+  ViewLayout,
+  YDatabase,
+  YDoc,
+  YjsEditorKey,
+} from '@/application/types';
 import ComponentLoading from '@/components/_shared/progress/ComponentLoading';
+import CalendarSkeleton from '@/components/_shared/skeleton/CalendarSkeleton';
+import DocumentSkeleton from '@/components/_shared/skeleton/DocumentSkeleton';
+import GridSkeleton from '@/components/_shared/skeleton/GridSkeleton';
+import KanbanSkeleton from '@/components/_shared/skeleton/KanbanSkeleton';
 import { Database } from '@/components/database';
 import DatabaseHeader from '@/components/database/components/header/DatabaseHeader';
 import { ViewMetaProps } from '@/components/view-meta';
@@ -8,17 +22,20 @@ import { useSearchParams } from 'react-router-dom';
 
 export interface DatabaseProps {
   doc: YDoc;
-  getViewRowsMap?: GetViewRowsMap;
+  createRowDoc?: CreateRowDoc;
   loadView?: LoadView;
   navigateToView?: (viewId: string) => Promise<void>;
   loadViewMeta?: LoadViewMeta;
   viewMeta: ViewMetaProps;
+  appendBreadcrumb?: AppendBreadcrumb;
+  onRendered?: () => void;
 }
 
-function DatabaseView({ viewMeta, ...props }: DatabaseProps) {
+function DatabaseView ({ viewMeta, ...props }: DatabaseProps) {
   const [search, setSearch] = useSearchParams();
   const visibleViewIds = useMemo(() => viewMeta.visibleViewIds || [], [viewMeta]);
 
+  const isTemplateThumb = usePublishContext()?.isTemplateThumb;
   const iidIndex = viewMeta.viewId;
   const viewId = useMemo(() => {
     return search.get('v') || iidIndex;
@@ -26,31 +43,58 @@ function DatabaseView({ viewMeta, ...props }: DatabaseProps) {
 
   const handleChangeView = useCallback(
     (viewId: string) => {
-      setSearch({ v: viewId });
+      setSearch(prev => {
+        prev.set('v', viewId);
+        return prev;
+      });
     },
-    [setSearch]
+    [setSearch],
   );
 
   const handleNavigateToRow = useCallback(
     (rowId: string) => {
-      setSearch({ r: rowId });
+      setSearch(prev => {
+        prev.set('r', rowId);
+        return prev;
+      });
     },
-    [setSearch]
+    [setSearch],
   );
 
   const rowId = search.get('r') || undefined;
+  const doc = props.doc;
+  const database = doc?.getMap(YjsEditorKey.data_section)?.get(YjsEditorKey.database) as YDatabase;
 
-  if (!viewId) return null;
+  const skeleton = useMemo(() => {
+    if (rowId) {
+      return <DocumentSkeleton />;
+    }
+
+    switch (viewMeta.layout) {
+      case ViewLayout.Grid:
+        return <GridSkeleton includeTitle={false} />;
+      case ViewLayout.Board:
+        return <KanbanSkeleton includeTitle={false} />;
+      case ViewLayout.Calendar:
+        return <CalendarSkeleton includeTitle={false} />;
+      default:
+        return <ComponentLoading />;
+    }
+  }, [rowId, viewMeta.layout]);
+
+  if (!viewId || !database) return null;
 
   return (
     <div
       style={{
         minHeight: 'calc(100vh - 48px)',
+        maxWidth: isTemplateThumb ? '964px' : undefined,
       }}
-      className={'relative flex h-full w-full flex-col px-16 max-md:px-4'}
+      className={'relative flex h-full w-full flex-col px-6'}
     >
-      <DatabaseHeader {...viewMeta} />
-      <Suspense fallback={<ComponentLoading />}>
+      {rowId ? null : <DatabaseHeader {...viewMeta} />}
+
+      <Suspense fallback={skeleton}>
         <Database
           iidName={viewMeta.name || ''}
           iidIndex={iidIndex || ''}
@@ -59,6 +103,7 @@ function DatabaseView({ viewMeta, ...props }: DatabaseProps) {
           rowId={rowId}
           visibleViewIds={visibleViewIds}
           onChangeView={handleChangeView}
+          hideConditions={true}
           onOpenRow={handleNavigateToRow}
         />
       </Suspense>

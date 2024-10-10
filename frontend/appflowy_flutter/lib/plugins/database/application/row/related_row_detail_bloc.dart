@@ -1,11 +1,14 @@
 import 'package:appflowy/workspace/application/view/view_service.dart';
 import 'package:appflowy_backend/dispatch/dispatch.dart';
+import 'package:appflowy_backend/log.dart';
 import 'package:appflowy_backend/protobuf/flowy-database2/protobuf.dart';
+import 'package:appflowy_backend/protobuf/flowy-user/user_profile.pb.dart';
 import 'package:appflowy_result/appflowy_result.dart';
 import 'package:bloc/bloc.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 import '../database_controller.dart';
+
 import 'row_controller.dart';
 
 part 'related_row_detail_bloc.freezed.dart';
@@ -20,12 +23,15 @@ class RelatedRowDetailPageBloc
     _init(databaseId, initialRowId);
   }
 
+  UserProfilePB? _userProfile;
+  UserProfilePB? get userProfile => _userProfile;
+
   @override
   Future<void> close() {
     state.whenOrNull(
-      ready: (databaseController, rowController) {
-        rowController.dispose();
-        databaseController.dispose();
+      ready: (databaseController, rowController) async {
+        await rowController.dispose();
+        await databaseController.dispose();
       },
     );
     return super.close();
@@ -33,11 +39,19 @@ class RelatedRowDetailPageBloc
 
   void _dispatch() {
     on<RelatedRowDetailPageEvent>((event, emit) async {
-      event.when(
-        didInitialize: (databaseController, rowController) {
-          state.maybeWhen(
-            ready: (_, oldRowController) {
-              oldRowController.dispose();
+      await event.when(
+        didInitialize: (databaseController, rowController) async {
+          final response = await UserEventGetUserProfile().send();
+          response.fold(
+            (userProfile) => _userProfile = userProfile,
+            (err) => Log.error(err),
+          );
+
+          await rowController.initialize();
+
+          await state.maybeWhen(
+            ready: (_, oldRowController) async {
+              await oldRowController.dispose();
               emit(
                 RelatedRowDetailPageState.ready(
                   databaseController: databaseController,
@@ -93,6 +107,7 @@ class RelatedRowDetailPageBloc
       viewId: inlineView.id,
       rowCache: databaseController.rowCache,
     );
+
     add(
       RelatedRowDetailPageEvent.didInitialize(
         databaseController,
